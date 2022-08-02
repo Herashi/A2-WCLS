@@ -1,0 +1,515 @@
+---
+title: "Case Study"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+require(ggpubr)
+library(dplyr)
+setwd("~/Documents/MRT_competition/Case Study")
+library(zoo)
+# source("xzoo.R")
+load("IHS_MRT.RData")
+library(geepack)
+library(mitml)
+library(table1)
+```
+
+```{r}
+## This file generates direct effect estimates 
+## If RDS files for the models already exist
+## Go to the file "present_results.R" to avoid re-running 
+## as code takes a while to generate the MI estimates.
+
+## Code to combine data over several impuations and properly pools the results, 
+## Since the randomization probability is constant, we can do this with gee
+
+
+num_impute = 20
+
+for(impute_iter in 9){
+  print(impute_iter)
+  analysis_dat_gee = IHS_MRT[[impute_iter]]
+  
+  
+  
+  # MOOD 
+  
+  analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "mood",1,0)
+
+  p_tilde = mean(analysis_dat_gee$week_category_new)
+  analysis_dat_gee$weights = ifelse(analysis_dat_gee$week_category_new==1,p_tilde/(1/4),
+                                    (1-p_tilde)/(3/4))
+
+  analysis_dat_gee$week_category_new_c = analysis_dat_gee$week_category_new - p_tilde
+  
+  
+  centering_par = aggregate(MOODprev~study_week, data = analysis_dat_gee, mean)
+  colnames(centering_par)[2] = "centering_par"
+  analysis_dat_gee = merge(analysis_dat_gee, centering_par, by = "study_week")
+  analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - analysis_dat_gee$centering_par
+
+  
+  gee_result_mood = geeglm(MOOD ~ week_category_new_c , data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  gee_result_mood2 = geeglm(MOOD ~ week_category_new_c + MOODprev_c , data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
+  gee_result_mood3 = geeglm(MOOD ~ week_category_new_c * MOODprev_c, data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
+  # gee_result_mood4 = geeglm(MOOD ~ week_category_new_c * (MOODprev_c+ Neu0_c + pre_intern_mood_c), data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
+  
+
+  
+  
+  
+  mood = data.frame(x = c("I","II", "III"),
+                  y = c(coef(gee_result_mood)["week_category_new_c"],
+                        coef(gee_result_mood2)["week_category_new_c"],
+                        coef(gee_result_mood3)["week_category_new_c"]),
+                  se = c(summary(gee_result_mood)$coefficients["week_category_new_c","Std.err"],
+                         summary(gee_result_mood2)$coefficients["week_category_new_c","Std.err"],
+                         summary(gee_result_mood3)$coefficients["week_category_new_c","Std.err"]),
+                  p = c(summary(gee_result_mood)$coefficients["week_category_new_c","Pr(>|W|)"],
+                         summary(gee_result_mood2)$coefficients["week_category_new_c","Pr(>|W|)"],
+                         summary(gee_result_mood3)$coefficients["week_category_new_c","Pr(>|W|)"]))
+
+
+  # STEP
+  
+  analysis_dat_gee = IHS_MRT[[impute_iter]]
+  
+  analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "activity",1,0)
+
+  p_tilde = mean(analysis_dat_gee$week_category_new)
+  analysis_dat_gee$weights = ifelse(analysis_dat_gee$week_category_new==1,p_tilde/(1/4),
+                                    (1-p_tilde)/(3/4))
+
+  analysis_dat_gee$week_category_new_c = analysis_dat_gee$week_category_new - p_tilde
+  
+  
+  centering_par = aggregate(STEP_COUNTprev~study_week, data = analysis_dat_gee, mean)
+  colnames(centering_par)[2] = "centering_par"
+  analysis_dat_gee = merge(analysis_dat_gee, centering_par, by = "study_week")
+  analysis_dat_gee$STEP_COUNTprev_c = analysis_dat_gee$STEP_COUNTprev - analysis_dat_gee$centering_par
+  
+  
+  gee_result = geeglm(STEP_COUNT ~ week_category_new_c , data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  gee_result2 = geeglm(STEP_COUNT ~ week_category_new_c + STEP_COUNTprev_c, data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
+  gee_result3 = geeglm(STEP_COUNT ~ week_category_new_c * STEP_COUNTprev_c, data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
+  
+  
+  
+  step = data.frame(x = c("I","II", "III"),
+                  y = c(coef(gee_result)["week_category_new_c"],
+                        coef(gee_result2)["week_category_new_c"],
+                        coef(gee_result3)["week_category_new_c"]),
+                  se = c(summary(gee_result)$coefficients["week_category_new_c","Std.err"],
+                         summary(gee_result2)$coefficients["week_category_new_c","Std.err"],
+                         summary(gee_result3)$coefficients["week_category_new_c","Std.err"]),
+                  p = c(summary(gee_result)$coefficients["week_category_new_c","Pr(>|W|)"],
+                         summary(gee_result2)$coefficients["week_category_new_c","Pr(>|W|)"],
+                         summary(gee_result3)$coefficients["week_category_new_c","Pr(>|W|)"]))
+  
+  
+  df = rbind(mood, step)
+  df$outcome = rep(c("MOOD","STEP"),each = 3)
+  
+  
+  if(mood[3,3]<mood[1,3] & step[3,3]<step[1,3]){
+    print(df)
+    
+    print((mood[1,3]^2)/(mood[3,3]^2))
+    print((step[1,3]^2)/(step[3,3]^2))
+    
+    print((mood[1,3]^2)/(mood[2,3]^2))
+    print((step[1,3]^2)/(step[2,3]^2))
+    
+    p_1 = ggplot(df, aes(x= x,y = y)) +
+  geom_pointrange(
+    aes(ymin = y-1.96* se, ymax = y+1.96*se, color = outcome ),
+    position = position_dodge(0.3)
+    )+
+  # scale_color_manual(values = c("#00AFBB", "#E7B800"))+
+  scale_color_brewer(palette="Paired")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+  xlab("Model")+
+  ylab("Causal Effect")+
+  geom_hline(yintercept=0, linetype="dashed")
+
+
+p_2 = ggplot(data=df, aes(x=x, y=se,fill = outcome)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  scale_fill_brewer(palette="Paired")+
+  # scale_fill_manual(values = c("#00AFBB", "#E7B800"))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+  xlab("Model")+
+  ylab("Standard Error")
+
+p = ggarrange(p_1, p_2, ncol=2,legend = "bottom",common.legend = T)
+
+
+print(p)
+  }else{
+    print("no improvement")
+  }
+
+
+  
+
+}
+
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+mood_results = testEstimates(mood_results)
+mood_results2 = testEstimates(mood_results2)
+mood_results3 = testEstimates(mood_results3)
+
+mood = data.frame(x = c("I","II", "III"),
+                  y = c(mood_results[["estimates"]]["week_category_new_c","Estimate"],
+                        mood_results2[["estimates"]]["week_category_new_c","Estimate"],
+                        mood_results3[["estimates"]]["week_category_new_c","Estimate"]),
+                  se = c(mood_results[["estimates"]]["week_category_new_c","Std.Error"],
+                         mood_results2[["estimates"]]["week_category_new_c","Std.Error"],
+                         mood_results3[["estimates"]]["week_category_new_c","Std.Error"]))
+
+step_results = testEstimates(step_results)
+step_results2 = testEstimates(step_results2)
+step_results3 = testEstimates(step_results3)
+
+
+step = data.frame(x = c("I","II", "III"),
+                  y = c(step_results[["estimates"]]["week_category_new_c","Estimate"],
+                        step_results2[["estimates"]]["week_category_new_c","Estimate"],
+                        step_results3[["estimates"]]["week_category_new_c","Estimate"]),
+                  se = c(step_results[["estimates"]]["week_category_new_c","Std.Error"],
+                         step_results2[["estimates"]]["week_category_new_c","Std.Error"],
+                         step_results3[["estimates"]]["week_category_new_c","Std.Error"]))
+
+
+df = rbind(mood, step)
+df$outcome = rep(c("MOOD","STEP"),each = 3)
+
+p_1 = ggplot(df, aes(x= x,y = y)) +
+  geom_pointrange(
+    aes(ymin = y-1.96* se, ymax = y+1.96*se, color = outcome ),
+    position = position_dodge(0.3)
+    )+
+  # scale_color_manual(values = c("#00AFBB", "#E7B800"))+
+  scale_color_brewer(palette="Paired")+
+  theme_bw()+ 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())+
+  xlab("Model")+
+  ylab("Causal Effect")+
+  geom_hline(yintercept=0, linetype="dashed")
+
+
+p_2 = ggplot(data=df, aes(x=x, y=se,fill = outcome)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  scale_fill_brewer(palette="Paired")+
+  # scale_fill_manual(values = c("#00AFBB", "#E7B800"))+
+  theme_bw()+ 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())+
+  xlab("Model")+
+  ylab("Standard Error")
+
+p = ggarrange(p_1, p_2, ncol=2,legend = "bottom",common.legend = T)
+p
+```
+
+
+## Plot
+
+
+```{r echo=FALSE}
+
+plot_moderator = function(fit_wcls, fit_cwcls, moderator= "day",y_name = "Mood Change",x_name = "Study Week"){
+  var_wcls = matrix(0, nrow = 2, ncol = 2)
+  coeff_wcls = coef(fit_wcls)[c("week_category_new_c",paste0("week_category_new_c:", moderator))]
+  
+  vcov_m = vcov(fit_wcls)
+  
+  var_wcls[1,1] = vcov_m["week_category_new_c","week_category_new_c"]
+  var_wcls[1,2] = vcov_m["week_category_new_c",paste0("week_category_new_c:", moderator)]
+  var_wcls[2,1] = var_wcls[1,2]
+  var_wcls[2,2] = vcov_m[paste0("week_category_new_c:", moderator),paste0("week_category_new_c:", moderator)]
+  
+  var_cwcls = matrix(0, nrow = 2, ncol = 2)
+  coeff_cwcls = coef(fit_cwcls)[c("week_category_new_c",paste0("week_category_new_c:", moderator))]
+  
+  vcov_m = vcov(fit_cwcls)
+  
+  var_cwcls[1,1] = vcov_m["week_category_new_c","week_category_new_c"]
+  var_cwcls[1,2] = vcov_m["week_category_new_c",paste0("week_category_new_c:", moderator)]
+  var_cwcls[2,1] = var_cwcls[1,2]
+  var_cwcls[2,2] = vcov_m[paste0("week_category_new_c:", moderator),paste0("week_category_new_c:", moderator)]
+  
+  
+  
+  data = as.data.frame(matrix(NA, nrow = 52, ncol = 5))
+  colnames(data) = c("x","y","lower","upper","Method")
+  data$x = rep(1:26,2)
+  data$Method = rep(c("A2-WCLS","WCLS"),each = 26)
+  
+  data$y[1:26] = coeff_cwcls[1]+ coeff_cwcls[2] *data$x[1:26] 
+  data$y[27:52] = coeff_wcls[1]+ coeff_wcls[2]*data$x[27:52]
+  
+  
+  
+  ########## part 1
+  var_cor_cwcls = var_cwcls
+  
+  calculate_se = function(x) sqrt(t(c(1,x))%*%var_cor_cwcls%*%c(1,x))
+  
+  se_cor = sapply(data$x[1:26],FUN=calculate_se)
+  
+  t_quantile <- qt(0.975, 1563-length(fit_cwcls[["coefficients"]]))
+  
+  data$lower[1:26] = data$y[1:26] - t_quantile*se_cor
+  data$upper[1:26] = data$y[1:26] + t_quantile*se_cor
+  
+  se_cwcls = se_cor
+  ####### part2
+  
+  var_cor_wcls = var_wcls
+  
+  calculate_se = function(x) sqrt(t(c(1,x))%*%var_cor_wcls%*%c(1,x))
+  
+  se_cor = sapply(data$x[27:52],FUN=calculate_se)
+  
+  se_wcls = se_cor
+  
+  t_quantile <- qt(0.975, 1563-length(fit_wcls[["coefficients"]]))
+  
+  data$lower[27:52] = data$y[27:52] - t_quantile*se_cor
+  data$upper[27:52] = data$y[27:52] + t_quantile*se_cor
+  
+  print((se_wcls)^2/(se_cwcls)^2)
+  
+  p<-ggplot(data=data, aes(x=x, y=y, colour=Method)) + 
+    geom_line()+
+    geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.1)+
+    xlab(x_name)+
+    ylab(y_name)+
+    theme_bw()+
+    scale_color_brewer(palette="Paired",direction = -1)+
+    theme(axis.line = element_line(colour = "black"),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank()) +
+    geom_hline(yintercept =0, linetype=2)+
+    theme(axis.text=element_text(size=12),
+          axis.title=element_text(size=14))
+  p
+  
+}
+
+pick_moderator = function(moderator, fit_cwcls,analysis_dat_gee){
+  beta_1 = coef(fit_cwcls)[paste0("week_category_new_c:", moderator)]
+  
+  df = data.frame(id = analysis_dat_gee$UserID,
+                  res = fit_cwcls[["residuals"]],
+                  w = analysis_dat_gee$weights,
+                  a_c = analysis_dat_gee$week_category_new_c,
+                  s_c = analysis_dat_gee[,moderator])
+  
+  U_1 = df %>% group_by(id) %>% summarise(sum(w*res*a_c))
+  U_2 = df %>% group_by(id) %>% summarise(sum(w*res*a_c^2*s_c))
+  
+  numerator = colMeans(U_1[,2]*U_2[,2])
+  denominator = colMeans(U_2[,2]*U_2[,2])
+  
+  if(sign(beta_1)==sign(numerator)){
+    if (abs(beta_1) <= 2*abs(numerator/denominator)){
+      print("Yes")
+    }
+  }
+  
+}
+```
+
+
+```{r eval=FALSE, include=FALSE}
+# set i = 9
+
+for (i in 9){
+  print(i)
+  analysis_dat_gee = IHS_MRT[[i]]
+
+  
+centering_model = lm(MOODprev~ study_week,data = analysis_dat_gee)
+analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - centering_model$fitted.values
+
+centering_model = lm(SLEEP_COUNTprev~ study_week,data = analysis_dat_gee)
+analysis_dat_gee$SLEEP_COUNTprev_c = analysis_dat_gee$SLEEP_COUNTprev - centering_model$fitted.values
+
+centering_model = lm(STEP_COUNTprev~ study_week ,data = analysis_dat_gee)
+analysis_dat_gee$STEP_COUNTprev_c = analysis_dat_gee$STEP_COUNTprev - centering_model$fitted.values
+
+#### MOOD
+
+analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "mood",1,0)
+p_tilde = mean(analysis_dat_gee$week_category_new)
+analysis_dat_gee$weights = ifelse(analysis_dat_gee$week_category_new==1,p_tilde/(1/4),
+                                    (1-p_tilde)/(3/4))
+
+analysis_dat_gee$week_category_new_c = analysis_dat_gee$week_category_new - p_tilde
+ 
+  fit_wcls = geeglm(MOOD ~ week_category_new_c * study_week, data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  
+  print(summary(fit_wcls))
+  
+   # fit_cwcls  = geeglm(MOOD ~ week_category_new_c * (study_week + Neu0_c + depr0_c + PHQtot0_c + pre_intern_mood_c + pre_intern_sleep_c + pre_intern_sqrt_step_c + SLEEP_COUNTprev_c +  STEP_COUNTprev_c), data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  fit_cwcls  = geeglm(MOOD ~ week_category_new_c * (study_week + STEP_COUNTprev_c + SLEEP_COUNTprev_c+ pre_intern_mood_c), weights = weights, data = analysis_dat_gee, id = UserID, scale.fix = T)
+  # 
+  # pick_moderator("pre_intern_mood_c",fit_cwcls,analysis_dat_gee)
+  # pick_moderator("STEP_COUNTprev_c",fit_cwcls,analysis_dat_gee)
+  # pick_moderator("SLEEP_COUNTprev_c",fit_cwcls,analysis_dat_gee)
+
+  print(summary(fit_cwcls))
+  
+ p1= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", x_name = "Study Week")
+
+ ### Step
+ 
+ analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "activity",1,0)
+
+  p_tilde = mean(analysis_dat_gee$week_category_new)
+  analysis_dat_gee$weights = ifelse(analysis_dat_gee$week_category_new==1,p_tilde/(1/4),
+                                    (1-p_tilde)/(3/4))
+
+  analysis_dat_gee$week_category_new_c = analysis_dat_gee$week_category_new - p_tilde
+
+  fit_wcls = geeglm(STEP_COUNT ~ week_category_new_c * study_week, data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  print(summary(fit_wcls))
+  
+   # fit_cwcls = geeglm(STEP_COUNT ~ week_category_new_c * (study_week + MOODprev_c + Neu0_c + depr0_c + PHQtot0_c + pre_intern_mood_c + pre_intern_sleep_c + pre_intern_sqrt_step_c + SLEEP_COUNTprev_c), data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  
+  fit_cwcls = geeglm(STEP_COUNT ~ week_category_new_c * (study_week + SLEEP_COUNTprev_c + pre_intern_sqrt_step_c + MOODprev_c),weights = weights, data = analysis_dat_gee, id = UserID, scale.fix = T)
+  print(summary(fit_cwcls))
+  
+  # pick_moderator("SLEEP_COUNTprev_c",fit_cwcls,analysis_dat_gee)
+  # pick_moderator("pre_intern_sqrt_step_c",fit_cwcls,analysis_dat_gee)
+  # pick_moderator("MOODprev_c",fit_cwcls,analysis_dat_gee)
+
+p2= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", y_name = "Step Count Change", x_name = "Study Week")
+
+
+# 
+#   fit_wcls = geeglm(SLEEP_COUNT ~ week_category_new_c * study_week, data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+# 
+#   
+#    fit_cwcls = geeglm(SLEEP_COUNT ~ week_category_new_c * (study_week + SLEEP_COUNTprev_c), data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+#    
+# 
+# p3=plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", y_name = "Sleep Time Change")
+
+# p = ggarrange(p1, p2,p3, ncol=3,legend = "bottom",common.legend = T)
+p = ggarrange(p1, p2, ncol=2,legend = "bottom",common.legend = T)
+print(p)
+}
+
+
+#### centering moderators
+
+# centering_model = lm(MOODprev~ study_week,data = analysis_dat_gee)
+# analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - centering_model$fitted.values
+
+# centering_model = lm(MOODprev ~ bs(study_week, df = 10, knots = seq(2,24,by = 2)), data = analysis_dat_gee)
+# analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - centering_model$fitted.values
+
+
+# #Plotting the Regression Line to the scatterplot   
+# plot(analysis_dat_gee$study_week,analysis_dat_gee$MOODprev,col="grey",xlab="study week",ylab="MOODprev")
+# points(1:26,predict(centering_model,newdata = list(study_week=1:26)),col="darkgreen",lwd=2,type="l")
+# #adding cutpoints
+# abline(v= seq(2,24,by = 2),lty=2,col="darkgreen")
+
+
+```
+
+### B spline exploration
+
+
+```{r}
+# library(splines)
+
+# 9
+#### MOOD
+
+for (i in 9){
+  print(i)
+  analysis_dat_gee = IHS_MRT[[i]]
+
+analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "mood",1,0)
+p_tilde = mean(analysis_dat_gee$week_category_new)
+analysis_dat_gee$weights = ifelse(analysis_dat_gee$week_category_new==1,p_tilde/(1/4),
+                                    (1-p_tilde)/(3/4))
+
+analysis_dat_gee$week_category_new_c = analysis_dat_gee$week_category_new - p_tilde
+
+
+
+centering_par = aggregate(MOODprev~study_week, data = analysis_dat_gee, mean)
+colnames(centering_par)[2] = "centering_par"
+analysis_dat_gee = merge(analysis_dat_gee, centering_par, by = "study_week")
+analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - analysis_dat_gee$centering_par
+
+### models
+ 
+  fit_wcls = geeglm(MOOD ~ week_category_new_c * study_week, data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  
+  # print(summary(fit_wcls))
+  
+  fit_cwcls  = geeglm(MOOD ~ week_category_new_c * (study_week + MOODprev_c), weights = weights, data = analysis_dat_gee, id = UserID, scale.fix = T)
+
+
+  # print(summary(fit_cwcls))
+  
+ p1= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", x_name = "Study Week")
+ 
+  ### Step
+ 
+  analysis_dat_gee = IHS_MRT[[i]]
+  
+  analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "activity",1,0)
+
+  p_tilde = mean(analysis_dat_gee$week_category_new)
+  analysis_dat_gee$weights = ifelse(analysis_dat_gee$week_category_new==1,p_tilde/(1/4),
+                                    (1-p_tilde)/(3/4))
+
+  analysis_dat_gee$week_category_new_c = analysis_dat_gee$week_category_new - p_tilde
+  
+  
+  centering_par = aggregate(STEP_COUNTprev~study_week, data = analysis_dat_gee, mean)
+  colnames(centering_par)[2] = "centering_par"
+  analysis_dat_gee = merge(analysis_dat_gee, centering_par, by = "study_week")
+  analysis_dat_gee$STEP_COUNTprev_c = analysis_dat_gee$STEP_COUNTprev - analysis_dat_gee$centering_par
+
+  fit_wcls = geeglm(STEP_COUNT ~ week_category_new_c * study_week, data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
+  # print(summary(fit_wcls))
+
+  
+  fit_cwcls = geeglm(STEP_COUNT ~ week_category_new_c * (study_week + STEP_COUNTprev_c),weights = weights, data = analysis_dat_gee, id = UserID, scale.fix = T)
+  # print(summary(fit_cwcls))
+
+
+p2= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", y_name = "Step Count Change", x_name = "Study Week")
+
+p = ggarrange(p1, p2, ncol=2,legend = "bottom",common.legend = T)
+print(p)
+
+}
+
+
+```
+
+
