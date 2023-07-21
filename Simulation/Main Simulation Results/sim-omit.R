@@ -1,4 +1,4 @@
-setwd("~/Documents/MRT_competition/Sim0_susan/data_all_p")
+setwd("~/Documents/GitHub/A2-WCLS/Simulation/Main Simulation Results")
 
 library("foreach")
 library("doParallel")
