@@ -8,7 +8,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 require(ggpubr)
 library(dplyr)
-setwd("~/Documents/MRT_competition/Case Study")
+setwd("~/Documents/A2-WCLS/Case Study")
 library(zoo)
 # source("xzoo.R")
 load("IHS_MRT.RData")
@@ -104,7 +104,7 @@ for(impute_iter in 9){
   
   
   df = rbind(mood, step)
-  df$outcome = rep(c("MOOD","STEP"),each = 3)
+  df$Outcome = rep(c("MOOD","STEP"),each = 3)
   
   
   if(mood[3,3]<mood[1,3] & step[3,3]<step[1,3]){
@@ -116,9 +116,10 @@ for(impute_iter in 9){
     print((mood[1,3]^2)/(mood[2,3]^2))
     print((step[1,3]^2)/(step[2,3]^2))
     
+    
     p_1 = ggplot(df, aes(x= x,y = y)) +
   geom_pointrange(
-    aes(ymin = y-1.96* se, ymax = y+1.96*se, color = outcome ),
+    aes(ymin = y-1.96* se, ymax = y+1.96*se, color = Outcome ),
     position = position_dodge(0.3)
     )+
   # scale_color_manual(values = c("#00AFBB", "#E7B800"))+
@@ -126,19 +127,23 @@ for(impute_iter in 9){
   theme_bw()+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-  xlab("Model")+
-  ylab("Causal Effect")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14))+
+  xlab("Estimator")+
+  ylab("Causal Excursion Effect")+
   geom_hline(yintercept=0, linetype="dashed")
 
 
-p_2 = ggplot(data=df, aes(x=x, y=se,fill = outcome)) +
+p_2 = ggplot(data=df, aes(x=x, y=se,fill = Outcome)) +
   geom_bar(stat="identity", position=position_dodge())+
   scale_fill_brewer(palette="Paired")+
   # scale_fill_manual(values = c("#00AFBB", "#E7B800"))+
   theme_bw()+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-  xlab("Model")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14))+
+  xlab("Estimator")+
   ylab("Standard Error")
 
 p = ggarrange(p_1, p_2, ncol=2,legend = "bottom",common.legend = T)
@@ -223,7 +228,7 @@ print(p)
 
 ```{r echo=FALSE}
 
-plot_moderator = function(fit_wcls, fit_cwcls, moderator= "day",y_name = "Mood Change",x_name = "Study Week"){
+plot_moderator = function(fit_wcls, fit_cwcls, moderator= "day",y_name = "Causal Excursion Effect",x_name = "Study Week"){
   var_wcls = matrix(0, nrow = 2, ncol = 2)
   coeff_wcls = coef(fit_wcls)[c("week_category_new_c",paste0("week_category_new_c:", moderator))]
   
@@ -287,8 +292,8 @@ plot_moderator = function(fit_wcls, fit_cwcls, moderator= "day",y_name = "Mood C
   print((se_wcls)^2/(se_cwcls)^2)
   
   p<-ggplot(data=data, aes(x=x, y=y, colour=Method)) + 
-    geom_line()+
-    geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.1)+
+    geom_line(aes(linetype=Method))+
+    geom_ribbon(aes(ymin=lower, ymax=upper,linetype=Method) , alpha=0.1)+
     xlab(x_name)+
     ylab(y_name)+
     theme_bw()+
@@ -301,6 +306,23 @@ plot_moderator = function(fit_wcls, fit_cwcls, moderator= "day",y_name = "Mood C
     geom_hline(yintercept =0, linetype=2)+
     theme(axis.text=element_text(size=12),
           axis.title=element_text(size=14))
+  
+  # p<-ggplot(data=data, aes(x=x, y=y, colour=Method)) + 
+  #   geom_line()+
+  #   geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.1)+
+  #   xlab(x_name)+
+  #   ylab(y_name)+
+  #   theme_bw()+
+  #   scale_color_brewer(palette="Paired",direction = -1)+
+  #   theme(axis.line = element_line(colour = "black"),
+  #         panel.grid.major = element_blank(),
+  #         panel.grid.minor = element_blank(),
+  #         panel.border = element_blank(),
+  #         panel.background = element_blank()) +
+  #   geom_hline(yintercept =0, linetype=2)+
+  #   theme(axis.text=element_text(size=12),
+  #         axis.title=element_text(size=14))
+
   p
   
 }
@@ -343,7 +365,7 @@ analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - analysis_dat_gee$cente
 
   # print(summary(fit_cwcls))
   
- p1= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", x_name = "Study Week")
+ p1= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", x_name = "Study Week",y_name = "Causal Excursion Effect (Mood)")
  
   ### Step
  
@@ -370,8 +392,8 @@ analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - analysis_dat_gee$cente
   fit_cwcls = geeglm(STEP_COUNT ~ week_category_new_c * (study_week + STEP_COUNTprev_c),weights = weights, data = analysis_dat_gee, id = UserID, scale.fix = T)
   # print(summary(fit_cwcls))
 
-
-p2= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week", y_name = "Step Count Change", x_name = "Study Week")
+# y_name = "Step Count Change",
+p2= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week",  x_name = "Study Week", y_name = "Causal Excursion Effect (Steps)")
 
 p = ggarrange(p1, p2, ncol=2,legend = "bottom",common.legend = T)
 print(p)

@@ -5,7 +5,7 @@ library("doParallel")
 library("parallel")
 source("init.R")
 source("group.R")
-# load("data_all_0.8.RData")
+# load("data_all_0.2.RData")
 
 ## set number of Monte Carlo replicates
 M <- 1000
@@ -24,7 +24,7 @@ registerDoParallel(cl)
 sim.omit <- function() {
   out <- NULL
   ## low, medium and high degrees of moderation by state
-  for (b in 0.8) {
+  for (b in 0) {
     for (n in 250) {
       group = group_all[[as.character(n)]]
       for (tmax in 30) {
