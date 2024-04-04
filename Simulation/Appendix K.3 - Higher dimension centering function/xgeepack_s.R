@@ -19,23 +19,11 @@ new_meat = function(l,x,wcovinv = NULL,...){
   # make a copy of df
   terms_df = df
   df$`I(state - statet)` = df$`I((a - pn) * (state - statet))`/df$`I(a - pn)`
-
   terms_df[,1] = beta_1*w*df$`I(a - pn)`
-  #terms_df[,2] = beta_1*w*df$`I(a - pn)`*df$`I(state - statet)`
   terms_df[,2] = beta_1*w*df$`I(a - pn)`*df$state
   terms_df[,3] = beta_1*w*df$`I(a - pn)`^2
   terms_df[,4] = -res*w*df$`I(a - pn)` + beta_1*w*df$`I(a - pn)`^2*df$`I(state - statet)`
-
-  # m = matrix(0,nrow = ncol(terms_df),ncol = nrow(v_base))
-  # S = split.data.frame(terms_df, x$id)
-  # for (i in 1:n){
-  #     a = S[[i]]
-  #   for (j in 1:nrow(v_base)){
-  #     m = m + t(a[j,]) %*% v_base[j,]
-  #   }
-  # }
-  #
-  # m = m/n
+  
 
   m <- mapply(function(S) t(S) %*% v_base,
               S = split.data.frame(terms_df, x$id),
@@ -66,12 +54,10 @@ new_meat = function(l,x,wcovinv = NULL,...){
   U_e = mapply(function(S) colSums(S*v_base),
                S = split(df$`I(state - statet)`*expec, x$id),
                SIMPLIFY = FALSE)
-
   e <- do.call("rbind", U_e)
 
-  Sigma_E_U <- e%*%E_inv%*%t(Sigma)
-
   
+  Sigma_E_U <- e%*%E_inv%*%t(Sigma)
   u_final= t(u-Sigma_E_U)%*%(u-Sigma_E_U)
   
   return(u_final)

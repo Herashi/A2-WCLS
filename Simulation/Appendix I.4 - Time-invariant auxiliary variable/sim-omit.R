@@ -29,7 +29,7 @@ sim.omit <- function() {
       group = group_all[[as.character(n)]]
       for (tmax in 30) {
         clusterSetRNGStream(cl, seed)
-        out <-sim_wc(n, tmax, M, all_data = all_data,
+        out <-sim_wc(n, tmax, M, 
                              ## regress response on state and proximal treatment,
                              ## ignoring the underlying interaction between the two
                              y.formula = list(w = y ~ state + I(a - pn),

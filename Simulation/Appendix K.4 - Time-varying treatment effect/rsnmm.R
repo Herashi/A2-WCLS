@@ -1,6 +1,6 @@
-# library(purrr)
+library(purrr)
 library("zoo")
-# library(foreach)
+library(foreach)
 source("xzoo.R")
 ## load functions needed for variance estimation
 source("xgeepack_s.R")
@@ -15,45 +15,13 @@ expit = function(a){
   return(exp(a) / (1 + exp(a)))
 }
 
-group_str = function(group){
-  group[["group size"]] = unname(table(group[["group_id"]]))
-  group[["#groups"]] = length(unique(group[["group_id"]]))
-  X = diag(rep(1,group[["#groups"]]))
-  X = X[rep(seq_len(nrow(X)),group[["group size"]]),]
-  colnames(X) = paste(rep("Group", group[["#groups"]]),seq(1,group[["#groups"]],1), sep = "_")
-  group[["indicator matrix"]] = X
-  
-  
-  err = c()
-  for (i in 1:group[["#groups"]]){
-    e = rnorm(1,mean = 0,sd = sqrt(group[["baseline sigma2"]][i]))
-    err = c(err,e)
-  }
-  group[["err"]] = err
-  group[["group err"]] = rep(group[["err"]],group[["group size"]])
-  
-  bg = c()
-  for (i in 1:group[["#groups"]]){
-    e = rnorm(1,mean = 0,sd = sqrt(group[["bg sigma2"]][i]))
-    bg = c(bg,e)
-  }
-  group[["bg"]] = bg
-  group[["random bg"]] = rep(group[["bg"]],group[["group size"]])
-  
-  
-  return(group)
-} 
-
-
 
 rsnmm = function(n, T,
                  ty, tmod, tavail, tstate,
                  beta, eta, mu, theta,
                  coefavail, coefstate, coeferr,
                  avail, base, state, a, prob,
-                 y, err, q, statec, ac, availc, 
-                 group_err, bg){
-  # a list indicating grouping structure
+                 y, err, q, statec, ac, availc){
   
   for (i in 0:(n-1)) {
     for (j in 2:T) {
@@ -63,38 +31,22 @@ rsnmm = function(n, T,
                 + coefavail[3] * a[i*T + j-1]
                 + coefavail[4] * y[i*T + j-1])
       # availability - uncentered and centered 
-      avail[i*T + j] = as.numeric(purrr::rbernoulli(1,r))
+      avail[i*T + j] = as.numeric(rbernoulli(1,r))
       availc[i*T + j] = avail[i*T + j] - r
       
-      # linearly change with time
-      # set q to be the truth
-      q[i*T + j] = j-1 
+      # overwrite the q vector as a time indicator
       #true effect now is -0.2 + 0.01 *(j-1) 
-      # time varying state, postively depending on the previous state
-      # 
-      # q[i*T + j] = q[i*T + j]+ coefstate[2] * q[i*T + j - 1]
-      # 
-      # #GP
-      # state[i*T + j] =  coefstate[1] *(j-1) +  q[i*T + j]
-      # statec[i*T + j] = state[i*T + j] - coefstate[1] *(j-1)
-      
-      
-      # probability that binary state is +1
-      # q_state = expit(coefstate[1]*(j-1)
-      #           + coefstate[2] * tstate[j]
-      #           + coefstate[3] * base[i*T + j-1 ]
-      #           + coefstate[4] * state[i*T + j-1]
-      #           + coefstate[5] * a[i*T + j-1])
-      
+      q[i*T + j] = j-1 
+     
+      # mean of the time-varying state variable
       q_state = coefstate[1]*(j-1)
       + coefstate[2] * tstate[j]
       + coefstate[3] * base[i*T + j-1 ]
       + coefstate[4] * state[i*T + j-1]
       + coefstate[5] * a[i*T + j-1]
       
-      # binary state on {-1, 1} - uncentered and centered
+      # state follows a uniform distribution where the variance is also varying over time
       state[i*T + j] = runif(1, min = q_state - 0.01*j, max = q_state + 0.01*j)
-      # state[i*T + j] = runif(1, min = q_state - 0.05, max = q_state + 0.05)
       statec[i*T + j] = state[i*T + j]  - q_state 
       
       # treatment probability 
@@ -104,17 +56,14 @@ rsnmm = function(n, T,
                                              + eta[4] * a[i*T + j - 1]
                                              + eta[5] * y[i*T + j - 1])
       
-      
-      
       # treatment indicator - uncentered and centered 
-      a[i*T + j] = as.numeric(purrr::rbernoulli(1, prob[i*T + j]))
+      a[i*T + j] = as.numeric(rbernoulli(1, prob[i*T + j]))
       ac[i*T + j] = a[i*T + j] - prob[i*T + j]
       # conditional mean response 
       ym = mu[1]+ 
         mu[2] * ty[j]+  # pre-evaluated time function 
         mu[3] * base[i*T + j]+
-        ac[i*T + j] * (beta[1] + 
-                         bg[i+1] + 
+        ac[i*T + j] * (beta[1]+ 
                          beta[2] * q[i*T + j] + # pre-evaluated time function
                          beta[3] * base[i*T + j]+
                          beta[4] * statec[i*T + j]+
@@ -130,7 +79,7 @@ rsnmm = function(n, T,
       # error 
       err[i*T + j] = err[i*T + j]+ coeferr * err[i*T + j - 1] 
       # response 
-      y[i*T + j] = ym + err[i*T + j]+ group_err[i+1]
+      y[i*T + j] = ym + err[i*T + j]
     }
   }
   
@@ -146,7 +95,7 @@ rsnmm = function(n, T,
 rsnmm.control <- function(origin = 1, sd = 1,
                           coralpha = sqrt(0.5),
                           corstr = c("ar1", "exchangeable"),
-                          beta0 = c(-0.2, 0.01, 0, 0.2, 0), beta1 = rep(0, 4),
+                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = rep(0, 4),
                           eta = c(0, 0, 0.8, -0.8, 0), mu = rep(0, 3),
                           theta0 = c(0, 0.8), theta1 = c(0, 0),
                           coef.avail = c(100, rep(0, 3)), coef.state = c(0.05,0,0,0,0.1) ,
@@ -181,7 +130,7 @@ rsnmm.control <- function(origin = 1, sd = 1,
 
 
 
-rsnmm.R <- function(n, tmax, group_ls, control, ...) {
+rsnmm.R <- function(n, tmax, control, ...) {
   control <- if (missing(control)) rsnmm.control(...)
   else do.call("rsnmm.control", control)
   tmax <- tmax + (tmax %% 2) + 1
@@ -208,16 +157,13 @@ rsnmm.R <- function(n, tmax, group_ls, control, ...) {
   
   
   #### provisional state probability GP
-  # q_sd = 1
-  # corq = 0
-  # q <- ifelse(time == 0, rnorm(n, sd = 1),
-  #             rnorm(n * (tmax - 1),
-  #                   sd = sqrt(q_sd^2 * (1 - corq^2))))
-  # q[time == 0] <- rnorm(n, sd = q_sd)
+  q_sd = 1
+  corq = 0
+  q <- ifelse(time == 0, rnorm(n, sd = 1),
+              rnorm(n * (tmax - 1),
+                    sd = sqrt(q_sd^2 * (1 - corq^2))))
+  q[time == 0] <- rnorm(n, sd = q_sd)
   #######
-  group = group_str(group_ls)
-  group_err = group[["group err"]]
-  bg = group[["random bg"]]
   
   d <- rsnmm(
     n = as.integer(n) ,
@@ -240,17 +186,14 @@ rsnmm.R <- function(n, tmax, group_ls, control, ...) {
     prob = as.double(rep(0, n * tmax)),
     y = as.double(rep(0, n * tmax)),
     err = as.double(err),
-    q = as.double(rep(0, n * tmax)),
+    q = as.double(q),
     statec = as.double(rep(0, n*tmax)),
     ac = as.double(rep(0, n*tmax)),
-    availc = as.double(rep(0, n*tmax)),
-    group_err =as.double(group_err),
-    bg = as.double(bg))
+    availc = as.double(rep(0, n*tmax)))
   
   d <- data.frame(id = rep(1:n, each = tmax), time = time,
                   ty = d$ty, tmod = d$tmod, tavail = d$tavail, tstate = d$tstate,
-                  base = d$base, state = d$state, true_effect = 0.02 *d$q - 0.2, a = d$a, y = d$y, err = d$err,
-                  group_err = rep(group_err, each = tmax), bg = rep(bg, each = tmax),
+                  base = d$base, state = d$state, q = d$q, a = d$a, y = d$y, err = d$err,
                   avail = d$avail, prob = d$p, a.center = d$a.center, state.center = d$state.center, 
                   avail.center = d$avail.center, one = 1)
   
@@ -278,7 +221,7 @@ rsnmm.R <- function(n, tmax, group_ls, control, ...) {
   return(d)
 }
 
-sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
+sim_wc <- function(n = 100, tmax = 30, M = 1000,
                    ## response regression models
                    y.formula = list(w = y ~ state + I(a - pn),
                                     u = y ~ I(state-statec) * I(a - pn)),
@@ -306,8 +249,6 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
                    # true_effect = -0.2 ,
                    ## print generative and analysis model details
                    verbose = TRUE,
-                   ## group structure
-                   group_ls, 
                    ## control parameters for 'rsnmm.R'
                    control, ...) {
   control <- if (missing(control)) rsnmm.control(...)
@@ -360,16 +301,15 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
                      addvar = NULL,c_vec, moderator) {
     if (response == "y") {
       runin <- runin.fity
-      w <- ifelse(d[, "a"] == 1, unique(fita[["fitted.values"]])/ d[, args[["w"]][["wd"]]],
-                  (1 - unique(fita[["fitted.values"]])) / (1 - d[, args[["w"]][["wd"]]]))
     }else{
       args$family <- binomial()
       runin <- runin.fita
-      w = rep(1, nrow(d))
     } 
     r <- which(d$time >= runin)
     l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
+    v_base = diag(1,nrow = length(r)/n)
     # no availability has 0 weight
+    w <- rep(1, nrow(d))
     w <- w * d$avail
     # lag != 0
     if (lag){
@@ -386,12 +326,8 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
       fun <- "lm.wfit"
     } 
     
-    
-    v_base = diag(1,nrow = length(r)/n)
-    
     if (sum(d$statet) ==0 & moderator != "None"){
-      # time-specific centering
-      d[,"statet"] = rep(aggregate(state~ time, data = d, FUN = mean)$state,n)
+      d[r,"statet"] = sum(w*(l$x[,3])^2*l$x[,2])/sum(w*(l$x[,3])^2)
       l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
       d$statet = 0
     }
@@ -416,23 +352,19 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
     }else {
       ## usual variance sandwich estimator
       fit$vcov <- vcov.geeglm(l,x = fit,moderator= moderator)
-      
-      if (length(c_vec) >1){
-        est <- estimate(fit, rbind("Average treatment effect" = c_vec[[1]]))[,1:4]
-        est_t <- estimate(fit, rbind("Time treatment effect" = c_vec[[2]]))[,1:4]
-        int_time_cov = fit$vcov[3,4]
-      }else{
-        est <- estimate(fit, rbind("Average treatment effect" = c_vec[[1]]))[,1:4]
-      }
-      
-      
+      est <- estimate(fit, rbind("Fully marginal treatment effect" = c_vec))[,1:4]
       ## correction for any estimates in weights
+      
       if (length(prob)){
         d[r, args[["w"]][["wn"]]] = fita[["fitted.values"]]
         # update the model matrix
         w <- ifelse(d[r, "a"] == 1, d[r, args[["w"]][["wn"]]]/ d[r, args[["w"]][["wd"]]],
                     (1 - d[r, args[["w"]][["wn"]]]) / (1 - d[r, args[["w"]][["wd"]]]))
         
+        for(i in 1:(tmax+1-runin.fity)) { 
+          nam <- paste("mu", i, sep = "_")
+          assign(nam,0)
+        }
         
         if (sum(d$statet) ==0 & moderator != "None"){
           l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
@@ -442,28 +374,12 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
           # III: only constant model
           # v_base = matrix(rep(c(1,0),c(T,(T-1)*T)),nrow = T,ncol = T)
           
-          
-          ### Lin's
-          # v_base = diag(1, nrow = T, ncol = T)
-          
-          #### IV
-          # f = rep(1,T)
-          # # p_t = rep(unique(d[r, args[["w"]][["wn"]]]),length.out = T)
-          # p_t = rowMeans(matrix(w*(l$x[,3])^2,ncol = n))
-          # weights = p_t * (1-p_t)
-          # projection = f%*%solve(t(f) %*% diag(weights) %*% f, t(f) %*% diag(weights))
-          # orthogonal_projection = diag(1, T) - projection
-          # PCA = eigen(orthogonal_projection)
-          # 
-          # v_base = PCA$vectors
-          
           # V
-          
           # linear function of time
           v_base = matrix(0,nrow = T, ncol=T)
           v_base[,1] =1
           v_base[,2] = 1:T
-          
+
           
           centering_model<- do.call(lm.wfit, list(x = v_base[rep(1:nrow(v_base),times = n),],
                                                   y = d[r, "state"],
@@ -478,7 +394,6 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
           d[r,"statet"] = centering_model[["fitted.values"]]
           l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
         }
-        
         
         l$w = w
         
@@ -495,7 +410,6 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
       }
       
       fit$vcov <- vcov.geeglm(l,x=fit,moderator= moderator)
-      
       
       if (length(c_vec) >1){
         estc <- estimate(fit, rbind("Average treatment effect" = c_vec[[1]]))[,1:4]
@@ -546,12 +460,16 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
   out = NULL
   
   out <- foreach(m = 1:M, .combine = "rbind") %dopar% {
-    d = all_data[[m]]
-    # d <- rsnmm.R(n, tmax,group_ls, control = control)
-    # d$pn <- d$pd <- d$prob
-    # 
-    # statec = aggregate(state~time,data = d,FUN = mean)$state
-    # d$statec = rep(statec,times=n)
+    # d = all_data[[m]]
+    d <- rsnmm.R(n, tmax, control = control)
+    d$pn <- d$pd <- d$prob
+    
+    statec = aggregate(state~time,data = d,FUN = mean)$state
+    d$statec = rep(statec,times=n)
+    
+    # the centering parameter will be calculated later
+    d$statet = 0
+    # set the centering parameter as the global mean.
     # d$statet = mean(d$state)
     
     ## ... fit treatment probability models
@@ -571,14 +489,13 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
                      moderator = y.moderator[["u"]])
     
     fity = rbind(fity_w,fity_u)
-    
-    # true = d$true_effect,
-    
+  
     fity <- data.frame(iter = m, 
                        method = c("Weighted and centered"),
                        fity, row.names = NULL)
     
     fity
+
     
   }
   
@@ -630,5 +547,6 @@ sim_wc <- function(n = 250, tmax = 30, M = 1000, all_data,
   
   
   return(list(out= out, out_w = out_w, out_u = out_u))
+  
   
 }

@@ -1,41 +1,66 @@
 ## geepack and sandwich extras
 
-# For 1 single arithmetic mean centering parameter
+library(popbio)
+
 new_meat = function(l,x,wcovinv = NULL,...){
   if (is.null(wcovinv)) wcovinv <- working.covariance(x, invert = TRUE)
   ## nb: small sample correction threshold can be set via '...'
   ##     no correction is applied to the estimating functions from 'pd' and 'pn'
   u <- estfun.geeglm(x, wcovinv = wcovinv, res = TRUE, ...)
   u <- u$estfun
+  n <- cluster.number(x, overall = FALSE)
   
   df = as.data.frame(l$x)
   w = l$w
   beta_1 = x[["coefficients"]][["I((a - pn) * (state - statet))"]]
   res = x[["residuals"]]
-  n <- cluster.number(x, overall = FALSE)
-  
+  v_base = x$v_base
+
   # make a copy of df
   terms_df = df
   df$`I(state - statet)` = df$`I((a - pn) * (state - statet))`/df$`I(a - pn)`
-  
   terms_df[,1] = beta_1*w*df$`I(a - pn)`
-  # terms_df[,2] = beta_1*w*df$`I(a - pn)`*df$`I(state - statet)`
   terms_df[,2] = beta_1*w*df$`I(a - pn)`*df$state
   terms_df[,3] = beta_1*w*df$`I(a - pn)`^2
   terms_df[,4] = -res*w*df$`I(a - pn)` + beta_1*w*df$`I(a - pn)`^2*df$`I(state - statet)`
+  
 
-  e <- sapply(split.data.frame(terms_df, x$id),colSums)
-  Sigma <- rowMeans(e)
+  m <- mapply(function(S) t(S) %*% v_base,
+              S = split.data.frame(terms_df, x$id),
+              SIMPLIFY = FALSE)
+
+  Sigma <- mean.list(m)
+
+
+  expec = w*df$`I(a - pn)`^2
+  e = split(expec, x$id)
+  ### try to improve later
+  v2 = array(NA, dim = c(nrow(v_base), dim(v_base)))
+  for (i in 1:dim(v2)[1]){
+    v2[i,,] = as.matrix(v_base[i,]) %*% v_base[i,]
+  }
+
+  E_u = matrix(0, nrow = nrow(v_base), ncol = ncol(v_base))
+  for (i in 1:n){
+    for (j in 1:length(e[[i]])){
+      E_u = E_u + v2[j,,] * e[[i]][j]
+    }
+  }
+
+  # E_inv = solve(-E_u/n)
+  E_inv = ginv(-E_u/n)
+  ###
+
+  U_e = mapply(function(S) colSums(S*v_base),
+               S = split(df$`I(state - statet)`*expec, x$id),
+               SIMPLIFY = FALSE)
+  e <- do.call("rbind", U_e)
+
   
-  E_inv <- -1
+  Sigma_E_U <- e%*%E_inv%*%t(Sigma)
+  u_final= t(u-Sigma_E_U)%*%(u-Sigma_E_U)
   
-  r = sapply(split(df$`I(state - statet)`, x$id),mean)
-  
-  Sigma_E_U <- matrix(r,ncol = 1) %*% matrix(Sigma,nrow = 1)*E_inv
-  
-  u = u-Sigma_E_U
-  
-  return(t(u)%*% u)
+  return(u_final)
 }
 
 

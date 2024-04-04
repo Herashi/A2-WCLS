@@ -10,27 +10,102 @@ require(ggpubr)
 library(dplyr)
 setwd("~/Documents/A2-WCLS/Case Study")
 library(zoo)
-# source("xzoo.R")
+source("xzoo.R")
 load("IHS_MRT.RData")
+## There are in total 20 imputed datasets, here we use the 9th one. 
+analysis_dat_gee = IHS_MRT[[9]]
 library(geepack)
 library(mitml)
 library(table1)
+### Plot function
+plot_moderator = function(fit_wcls, fit_cwcls, moderator= "day",y_name = "Causal Excursion Effect",x_name = "Study Week"){
+  var_wcls = matrix(0, nrow = 2, ncol = 2)
+  coeff_wcls = coef(fit_wcls)[c("week_category_new_c",paste0("week_category_new_c:", moderator))]
+  
+  vcov_m = vcov(fit_wcls)
+  
+  var_wcls[1,1] = vcov_m["week_category_new_c","week_category_new_c"]
+  var_wcls[1,2] = vcov_m["week_category_new_c",paste0("week_category_new_c:", moderator)]
+  var_wcls[2,1] = var_wcls[1,2]
+  var_wcls[2,2] = vcov_m[paste0("week_category_new_c:", moderator),paste0("week_category_new_c:", moderator)]
+  
+  var_cwcls = matrix(0, nrow = 2, ncol = 2)
+  coeff_cwcls = coef(fit_cwcls)[c("week_category_new_c",paste0("week_category_new_c:", moderator))]
+  
+  vcov_m = vcov(fit_cwcls)
+  
+  var_cwcls[1,1] = vcov_m["week_category_new_c","week_category_new_c"]
+  var_cwcls[1,2] = vcov_m["week_category_new_c",paste0("week_category_new_c:", moderator)]
+  var_cwcls[2,1] = var_cwcls[1,2]
+  var_cwcls[2,2] = vcov_m[paste0("week_category_new_c:", moderator),paste0("week_category_new_c:", moderator)]
+  
+  
+  
+  data = as.data.frame(matrix(NA, nrow = 52, ncol = 5))
+  colnames(data) = c("x","y","lower","upper","Method")
+  data$x = rep(1:26,2)
+  data$Method = rep(c("A2-WCLS","WCLS"),each = 26)
+  
+  data$y[1:26] = coeff_cwcls[1]+ coeff_cwcls[2] *data$x[1:26] 
+  data$y[27:52] = coeff_wcls[1]+ coeff_wcls[2]*data$x[27:52]
+  
+  
+  
+  ########## part 1
+  var_cor_cwcls = var_cwcls
+  
+  calculate_se = function(x) sqrt(t(c(1,x))%*%var_cor_cwcls%*%c(1,x))
+  
+  se_cor = sapply(data$x[1:26],FUN=calculate_se)
+  
+  t_quantile <- qt(0.975, 1563-length(fit_cwcls[["coefficients"]]))
+  
+  data$lower[1:26] = data$y[1:26] - t_quantile*se_cor
+  data$upper[1:26] = data$y[1:26] + t_quantile*se_cor
+  
+  se_cwcls = se_cor
+  ####### part2
+  
+  var_cor_wcls = var_wcls
+  
+  calculate_se = function(x) sqrt(t(c(1,x))%*%var_cor_wcls%*%c(1,x))
+  
+  se_cor = sapply(data$x[27:52],FUN=calculate_se)
+  
+  se_wcls = se_cor
+  
+  t_quantile <- qt(0.975, 1563-length(fit_wcls[["coefficients"]]))
+  
+  data$lower[27:52] = data$y[27:52] - t_quantile*se_cor
+  data$upper[27:52] = data$y[27:52] + t_quantile*se_cor
+  
+  print((se_wcls)^2/(se_cwcls)^2)
+  
+  p<-ggplot(data=data, aes(x=x, y=y, colour=Method)) + 
+    geom_line(aes(linetype=Method))+
+    geom_ribbon(aes(ymin=lower, ymax=upper,linetype=Method) , alpha=0.1)+
+    xlab(x_name)+
+    ylab(y_name)+
+    theme_bw()+
+    scale_color_brewer(palette="Paired",direction = -1)+
+    theme(axis.line = element_line(colour = "black"),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank()) +
+    geom_hline(yintercept =0, linetype=2)+
+    theme(axis.text=element_text(size=12),
+          axis.title=element_text(size=14))
+
+  p
+  
+}
 ```
 
 ## Marginal effect comparison
 
 ```{r}
 
-num_impute = 20
-
-## There are in total 20 imputed datasets, here we use the 9th one. 
-
-for(impute_iter in 9){
-  print(impute_iter)
-  analysis_dat_gee = IHS_MRT[[impute_iter]]
-  
-  
-  
   # MOOD 
   
   analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "mood",1,0)
@@ -51,7 +126,6 @@ for(impute_iter in 9){
   gee_result_mood = geeglm(MOOD ~ week_category_new_c , data = analysis_dat_gee,weights = weights, id = UserID, scale.fix = T)
   gee_result_mood2 = geeglm(MOOD ~ week_category_new_c + MOODprev_c , data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
   gee_result_mood3 = geeglm(MOOD ~ week_category_new_c * MOODprev_c, data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
-  # gee_result_mood4 = geeglm(MOOD ~ week_category_new_c * (MOODprev_c+ Neu0_c + pre_intern_mood_c), data = analysis_dat_gee, weights = weights, id = UserID, scale.fix = T)
   
   
   mood = data.frame(x = c("I","II", "III"),
@@ -68,7 +142,7 @@ for(impute_iter in 9){
 
   # STEP
   
-  analysis_dat_gee = IHS_MRT[[impute_iter]]
+  
   
   analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "activity",1,0)
 
@@ -155,190 +229,17 @@ print(p)
   }
 
 
-  
-
-}
-
 
 ```
 
-
-<!-- # ```{r eval=FALSE, include=FALSE} -->
-<!-- # mood_results = testEstimates(mood_results) -->
-<!-- # mood_results2 = testEstimates(mood_results2) -->
-<!-- # mood_results3 = testEstimates(mood_results3) -->
-<!-- #  -->
-<!-- # mood = data.frame(x = c("I","II", "III"), -->
-<!-- #                   y = c(mood_results[["estimates"]]["week_category_new_c","Estimate"], -->
-<!-- #                         mood_results2[["estimates"]]["week_category_new_c","Estimate"], -->
-<!-- #                         mood_results3[["estimates"]]["week_category_new_c","Estimate"]), -->
-<!-- #                   se = c(mood_results[["estimates"]]["week_category_new_c","Std.Error"], -->
-<!-- #                          mood_results2[["estimates"]]["week_category_new_c","Std.Error"], -->
-<!-- #                          mood_results3[["estimates"]]["week_category_new_c","Std.Error"])) -->
-<!-- #  -->
-<!-- # step_results = testEstimates(step_results) -->
-<!-- # step_results2 = testEstimates(step_results2) -->
-<!-- # step_results3 = testEstimates(step_results3) -->
-<!-- #  -->
-<!-- #  -->
-<!-- # step = data.frame(x = c("I","II", "III"), -->
-<!-- #                   y = c(step_results[["estimates"]]["week_category_new_c","Estimate"], -->
-<!-- #                         step_results2[["estimates"]]["week_category_new_c","Estimate"], -->
-<!-- #                         step_results3[["estimates"]]["week_category_new_c","Estimate"]), -->
-<!-- #                   se = c(step_results[["estimates"]]["week_category_new_c","Std.Error"], -->
-<!-- #                          step_results2[["estimates"]]["week_category_new_c","Std.Error"], -->
-<!-- #                          step_results3[["estimates"]]["week_category_new_c","Std.Error"])) -->
-<!-- #  -->
-<!-- #  -->
-<!-- # df = rbind(mood, step) -->
-<!-- # df$outcome = rep(c("MOOD","STEP"),each = 3) -->
-<!-- #  -->
-<!-- # p_1 = ggplot(df, aes(x= x,y = y)) + -->
-<!-- #   geom_pointrange( -->
-<!-- #     aes(ymin = y-1.96* se, ymax = y+1.96*se, color = outcome ), -->
-<!-- #     position = position_dodge(0.3) -->
-<!-- #     )+ -->
-<!-- #   # scale_color_manual(values = c("#00AFBB", "#E7B800"))+ -->
-<!-- #   scale_color_brewer(palette="Paired")+ -->
-<!-- #   theme_bw()+  -->
-<!-- #   theme(panel.grid.major = element_blank(),  -->
-<!-- #         panel.grid.minor = element_blank())+ -->
-<!-- #   xlab("Model")+ -->
-<!-- #   ylab("Causal Effect")+ -->
-<!-- #   geom_hline(yintercept=0, linetype="dashed") -->
-<!-- #  -->
-<!-- #  -->
-<!-- # p_2 = ggplot(data=df, aes(x=x, y=se,fill = outcome)) + -->
-<!-- #   geom_bar(stat="identity", position=position_dodge())+ -->
-<!-- #   scale_fill_brewer(palette="Paired")+ -->
-<!-- #   # scale_fill_manual(values = c("#00AFBB", "#E7B800"))+ -->
-<!-- #   theme_bw()+  -->
-<!-- #   theme(panel.grid.major = element_blank(),  -->
-<!-- #         panel.grid.minor = element_blank())+ -->
-<!-- #   xlab("Model")+ -->
-<!-- #   ylab("Standard Error") -->
-<!-- #  -->
-<!-- # p = ggarrange(p_1, p_2, ncol=2,legend = "bottom",common.legend = T) -->
-<!-- # p -->
-<!-- # ``` -->
-
-
-### Plot function
-
-
-```{r echo=FALSE}
-
-plot_moderator = function(fit_wcls, fit_cwcls, moderator= "day",y_name = "Causal Excursion Effect",x_name = "Study Week"){
-  var_wcls = matrix(0, nrow = 2, ncol = 2)
-  coeff_wcls = coef(fit_wcls)[c("week_category_new_c",paste0("week_category_new_c:", moderator))]
-  
-  vcov_m = vcov(fit_wcls)
-  
-  var_wcls[1,1] = vcov_m["week_category_new_c","week_category_new_c"]
-  var_wcls[1,2] = vcov_m["week_category_new_c",paste0("week_category_new_c:", moderator)]
-  var_wcls[2,1] = var_wcls[1,2]
-  var_wcls[2,2] = vcov_m[paste0("week_category_new_c:", moderator),paste0("week_category_new_c:", moderator)]
-  
-  var_cwcls = matrix(0, nrow = 2, ncol = 2)
-  coeff_cwcls = coef(fit_cwcls)[c("week_category_new_c",paste0("week_category_new_c:", moderator))]
-  
-  vcov_m = vcov(fit_cwcls)
-  
-  var_cwcls[1,1] = vcov_m["week_category_new_c","week_category_new_c"]
-  var_cwcls[1,2] = vcov_m["week_category_new_c",paste0("week_category_new_c:", moderator)]
-  var_cwcls[2,1] = var_cwcls[1,2]
-  var_cwcls[2,2] = vcov_m[paste0("week_category_new_c:", moderator),paste0("week_category_new_c:", moderator)]
-  
-  
-  
-  data = as.data.frame(matrix(NA, nrow = 52, ncol = 5))
-  colnames(data) = c("x","y","lower","upper","Method")
-  data$x = rep(1:26,2)
-  data$Method = rep(c("A2-WCLS","WCLS"),each = 26)
-  
-  data$y[1:26] = coeff_cwcls[1]+ coeff_cwcls[2] *data$x[1:26] 
-  data$y[27:52] = coeff_wcls[1]+ coeff_wcls[2]*data$x[27:52]
-  
-  
-  
-  ########## part 1
-  var_cor_cwcls = var_cwcls
-  
-  calculate_se = function(x) sqrt(t(c(1,x))%*%var_cor_cwcls%*%c(1,x))
-  
-  se_cor = sapply(data$x[1:26],FUN=calculate_se)
-  
-  t_quantile <- qt(0.975, 1563-length(fit_cwcls[["coefficients"]]))
-  
-  data$lower[1:26] = data$y[1:26] - t_quantile*se_cor
-  data$upper[1:26] = data$y[1:26] + t_quantile*se_cor
-  
-  se_cwcls = se_cor
-  ####### part2
-  
-  var_cor_wcls = var_wcls
-  
-  calculate_se = function(x) sqrt(t(c(1,x))%*%var_cor_wcls%*%c(1,x))
-  
-  se_cor = sapply(data$x[27:52],FUN=calculate_se)
-  
-  se_wcls = se_cor
-  
-  t_quantile <- qt(0.975, 1563-length(fit_wcls[["coefficients"]]))
-  
-  data$lower[27:52] = data$y[27:52] - t_quantile*se_cor
-  data$upper[27:52] = data$y[27:52] + t_quantile*se_cor
-  
-  print((se_wcls)^2/(se_cwcls)^2)
-  
-  p<-ggplot(data=data, aes(x=x, y=y, colour=Method)) + 
-    geom_line(aes(linetype=Method))+
-    geom_ribbon(aes(ymin=lower, ymax=upper,linetype=Method) , alpha=0.1)+
-    xlab(x_name)+
-    ylab(y_name)+
-    theme_bw()+
-    scale_color_brewer(palette="Paired",direction = -1)+
-    theme(axis.line = element_line(colour = "black"),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.border = element_blank(),
-          panel.background = element_blank()) +
-    geom_hline(yintercept =0, linetype=2)+
-    theme(axis.text=element_text(size=12),
-          axis.title=element_text(size=14))
-  
-  # p<-ggplot(data=data, aes(x=x, y=y, colour=Method)) + 
-  #   geom_line()+
-  #   geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.1)+
-  #   xlab(x_name)+
-  #   ylab(y_name)+
-  #   theme_bw()+
-  #   scale_color_brewer(palette="Paired",direction = -1)+
-  #   theme(axis.line = element_line(colour = "black"),
-  #         panel.grid.major = element_blank(),
-  #         panel.grid.minor = element_blank(),
-  #         panel.border = element_blank(),
-  #         panel.background = element_blank()) +
-  #   geom_hline(yintercept =0, linetype=2)+
-  #   theme(axis.text=element_text(size=12),
-  #         axis.title=element_text(size=14))
-
-  p
-  
-}
-
-```
 
 ## Time-varying effect comparison
 
 ```{r}
 
-# 9
+
 #### MOOD
 
-for (i in 9){
-  print(i)
-  analysis_dat_gee = IHS_MRT[[i]]
 
 analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "mood",1,0)
 p_tilde = mean(analysis_dat_gee$week_category_new)
@@ -369,8 +270,6 @@ analysis_dat_gee$MOODprev_c = analysis_dat_gee$MOODprev - analysis_dat_gee$cente
  
   ### Step
  
-  analysis_dat_gee = IHS_MRT[[i]]
-  
   analysis_dat_gee$week_category_new = ifelse(analysis_dat_gee$week_category == "activity",1,0)
 
   p_tilde = mean(analysis_dat_gee$week_category_new)
@@ -397,9 +296,6 @@ p2= plot_moderator(fit_wcls, fit_cwcls, moderator= "study_week",  x_name = "Stud
 
 p = ggarrange(p1, p2, ncol=2,legend = "bottom",common.legend = T)
 print(p)
-
-}
-
 
 ```
 

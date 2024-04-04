@@ -1,11 +1,9 @@
 setwd("~/Documents")
-
 library("foreach")
 library("doParallel")
 library("parallel")
 source("init.R")
-source("group.R")
-# load("data_all_0.2.RData")
+
 
 ## set number of Monte Carlo replicates
 M <- 1000
@@ -23,13 +21,13 @@ registerDoParallel(cl)
 
 sim.omit <- function() {
   out <- NULL
-  ## low, medium and high degrees of moderation by state
+  ## here the state is in fact not an effect moderator
   for (b in 0) {
     for (n in 250) {
       group = group_all[[as.character(n)]]
       for (tmax in 30) {
         clusterSetRNGStream(cl, seed)
-        out <-sim_wc(n, tmax, M, all_data = all_data,
+        out <-sim_wc(n, tmax, M, 
                              ## regress response on state and proximal treatment,
                              ## ignoring the underlying interaction between the two
                              y.formula = list(w = y ~ state + I(a - pn),

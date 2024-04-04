@@ -15,35 +15,23 @@ new_meat = function(l,x,wcovinv = NULL,...){
   beta_1 = x[["coefficients"]][["I((a - pn) * (state - statet))"]]
   res = x[["residuals"]]
   v_base = x$v_base
-  
+
   # make a copy of df
   terms_df = df
   df$`I(state - statet)` = df$`I((a - pn) * (state - statet))`/df$`I(a - pn)`
-  
   terms_df[,1] = beta_1*w*df$`I(a - pn)`
-  #terms_df[,2] = beta_1*w*df$`I(a - pn)`*df$`I(state - statet)`
   terms_df[,2] = beta_1*w*df$`I(a - pn)`*df$state
   terms_df[,3] = beta_1*w*df$`I(a - pn)`^2
   terms_df[,4] = -res*w*df$`I(a - pn)` + beta_1*w*df$`I(a - pn)`^2*df$`I(state - statet)`
   
-  # m = matrix(0,nrow = ncol(terms_df),ncol = nrow(v_base))
-  # S = split.data.frame(terms_df, x$id)
-  # for (i in 1:n){
-  #     a = S[[i]]
-  #   for (j in 1:nrow(v_base)){
-  #     m = m + t(a[j,]) %*% v_base[j,]
-  #   }
-  # }
-  #
-  # m = m/n
-  
+
   m <- mapply(function(S) t(S) %*% v_base,
               S = split.data.frame(terms_df, x$id),
               SIMPLIFY = FALSE)
-  
+
   Sigma <- mean.list(m)
-  
-  
+
+
   expec = w*df$`I(a - pn)`^2
   e = split(expec, x$id)
   ### try to improve later
@@ -51,32 +39,29 @@ new_meat = function(l,x,wcovinv = NULL,...){
   for (i in 1:dim(v2)[1]){
     v2[i,,] = as.matrix(v_base[i,]) %*% v_base[i,]
   }
-  
+
   E_u = matrix(0, nrow = nrow(v_base), ncol = ncol(v_base))
   for (i in 1:n){
     for (j in 1:length(e[[i]])){
       E_u = E_u + v2[j,,] * e[[i]][j]
     }
   }
-  
+
   # E_inv = solve(-E_u/n)
   E_inv = ginv(-E_u/n)
   ###
-  
+
   U_e = mapply(function(S) colSums(S*v_base),
                S = split(df$`I(state - statet)`*expec, x$id),
                SIMPLIFY = FALSE)
-  
   e <- do.call("rbind", U_e)
+
   
   Sigma_E_U <- e%*%E_inv%*%t(Sigma)
-  
   u_final= t(u-Sigma_E_U)%*%(u-Sigma_E_U)
   
   return(u_final)
 }
-
-
 
 
 meat.geeglm <- function(x, pn = NULL, pd = pn, lag = 0, wcovinv = NULL,
@@ -501,6 +486,7 @@ estimate <- function(x, combos = NULL, omnibus = FALSE, null = 0,
     pfun <- if (normal) function(q) 1 - mapply(pchisq, q = q, df = d1)
     else function(q) 1 - mapply(pf, q = q, df1 = d1, df2 = d2)
   }
+  x[["vcov"]] = x[["vcov"]][1:length(combos),1:length(combos)]
   var.est <- combos %*% x[["vcov"]] %*% t(combos)
   se.est <- sqrt(diag(var.est))
   crit <- sqrt(qfun(conf.int))

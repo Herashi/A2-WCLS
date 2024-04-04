@@ -4,8 +4,6 @@ library("foreach")
 library("doParallel")
 library("parallel")
 source("init.R")
-source("group.R")
-# load("data_all_0.8.RData")
 
 ## set number of Monte Carlo replicates
 M <- 1000
