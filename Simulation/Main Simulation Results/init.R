@@ -1,9 +1,9 @@
+source("group.R")
 library("geepack")
 library("zoo")
-
+library("foreach")
+library("doParallel")
+library("parallel")
 source("xgeepack_s.R")
 source("xzoo.R")
-
-#system("R CMD SHLIB rsnmm.c")
-#dyn.load(if (Sys.info()["sysname"] == "Windows") "rsnmm.dll" else "rsnmm.so")
 source("rsnmm.R")

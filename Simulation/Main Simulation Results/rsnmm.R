@@ -16,78 +16,8 @@ expit = function(a){
 }
 
 
-rsnmm = function(n, T,
-                 ty, tmod, tavail, tstate,
-                 beta, eta, mu, theta,
-                 coefavail, coefstate, coeferr,
-                 avail, base, state, a, prob,
-                 y, err, q, statec, ac, availc){
-  
-  for (i in 0:(n-1)) {
-    for (j in 2:T) {
-      # probability of availabilty 
-      r = expit(coefavail[1]
-                + coefavail[2] * tavail[j]
-                + coefavail[3] * a[i*T + j-1]
-                + coefavail[4] * y[i*T + j-1])
-      # availability - uncentered and centered 
-      avail[i*T + j] = as.numeric(rbernoulli(1,r))
-      availc[i*T + j] = avail[i*T + j] - r
-      
-      # probability that binary state is +1
-      q_state = expit(coefstate[1]*(j-1)
-                      + coefstate[2] * tstate[j]
-                      + coefstate[3] * base[i*T + j-1 ]
-                      + coefstate[4] * state[i*T + j-1]
-                      + coefstate[5] * a[i*T + j-1])
-      
-      # binary state on {-1, 1} - uncentered and centered
-      state[i*T + j] = ifelse(as.numeric(rbernoulli(1,q_state)) < 1 ,-1 ,1)
-      statec[i*T + j] = state[i*T + j] - (q_state - (1 - q_state))
-      
-      # treatment probability 
-      prob[i*T + j] = avail[i*T + j] * expit(eta[1]
-                                             + eta[2] * base[i*T + j]
-                                             + eta[3] * state[i*T + j]
-                                             + eta[4] * a[i*T + j - 1]
-                                             + eta[5] * y[i*T + j - 1])
-      
-      # treatment indicator - uncentered and centered 
-      a[i*T + j] = as.numeric(rbernoulli(1, prob[i*T + j]))
-      ac[i*T + j] = a[i*T + j] - prob[i*T + j]
-      # conditional mean response 
-      ym = mu[1]+ 
-        mu[2] * ty[j]+  # pre-evaluated time function 
-        mu[3] * base[i*T + j]+
-        ac[i*T + j] * (beta[1]+ 
-                         beta[2] * q[i*T + j] + # pre-evaluated time function
-                         beta[3] * base[i*T + j]+
-                         beta[4] * statec[i*T + j]+
-                         beta[5] * a[i*T + j - 1])+
-        ac[i*T + j - 1] * (beta[6]+
-                             beta[7] * tmod[j - 1]+
-                             beta[8] * base[i*T + j - 1]+
-                             beta[9] * state[i*T + j - 1])+
-        theta[1] * availc[i*T + j]+
-        theta[2] * state[i*T + j]+
-        theta[3] * availc[i*T + j - 1]+
-        theta[4] * statec[i*T + j - 1]
-      # error 
-      err[i*T + j] = err[i*T + j]+ coeferr * err[i*T + j - 1] 
-      # response 
-      y[i*T + j] = ym + err[i*T + j]
-    }
-  }
-  
-  d = data.frame(ty = ty, tmod = tmod, tavail = tavail, tstate = tstate,
-                 base = base, state = state, q = q, a = a, y = y, err = err,
-                 avail = avail, p = prob, a.center = ac,
-                 state.center = statec, avail.center = availc)
-  return(d)
-}
 
-
-
+# stores all the key parameters settings for generating the observations
 rsnmm.control <- function(origin = 1, sd = 1,
                           coralpha = sqrt(0.5),
                           corstr = c("ar1", "exchangeable"),
@@ -125,7 +55,10 @@ rsnmm.control <- function(origin = 1, sd = 1,
 }
 
 
-
+# Generate the full dataset
+# A wrapper function containing both rsnmm.control and rsnmm
+# n: sample size 
+# tmax = T + runin
 rsnmm.R <- function(n, tmax, control, ...) {
   control <- if (missing(control)) rsnmm.control(...)
   else do.call("rsnmm.control", control)
@@ -160,6 +93,79 @@ rsnmm.R <- function(n, tmax, control, ...) {
                     sd = sqrt(q_sd^2 * (1 - corq^2))))
   q[time == 0] <- rnorm(n, sd = q_sd)
   #######
+  
+  # Generate the simulation data set with given parameters
+  rsnmm = function(n, T,
+                   ty, tmod, tavail, tstate,
+                   beta, eta, mu, theta,
+                   coefavail, coefstate, coeferr,
+                   avail, base, state, a, prob,
+                   y, err, q, statec, ac, availc){
+    
+    for (i in 0:(n-1)) {
+      for (j in 2:T) {
+        # probability of availabilty 
+        r = expit(coefavail[1]
+                  + coefavail[2] * tavail[j]
+                  + coefavail[3] * a[i*T + j-1]
+                  + coefavail[4] * y[i*T + j-1])
+        # availability - uncentered and centered 
+        avail[i*T + j] = as.numeric(rbernoulli(1,r))
+        availc[i*T + j] = avail[i*T + j] - r
+        
+        # probability that binary state is +1
+        q_state = expit(coefstate[1]*(j-1)
+                        + coefstate[2] * tstate[j]
+                        + coefstate[3] * base[i*T + j-1 ]
+                        + coefstate[4] * state[i*T + j-1]
+                        + coefstate[5] * a[i*T + j-1])
+        
+        # binary state on {-1, 1} - uncentered and centered
+        state[i*T + j] = ifelse(as.numeric(rbernoulli(1,q_state)) < 1 ,-1 ,1)
+        statec[i*T + j] = state[i*T + j] - (q_state - (1 - q_state))
+        
+        # treatment randomization probability 
+        prob[i*T + j] = avail[i*T + j] * expit(eta[1]
+                                               + eta[2] * base[i*T + j]
+                                               + eta[3] * state[i*T + j]
+                                               + eta[4] * a[i*T + j - 1]
+                                               + eta[5] * y[i*T + j - 1])
+        
+        # treatment indicator - uncentered and centered 
+        a[i*T + j] = as.numeric(rbernoulli(1, prob[i*T + j]))
+        ac[i*T + j] = a[i*T + j] - prob[i*T + j]
+        # conditional mean response 
+        ym = mu[1]+ 
+          mu[2] * ty[j]+  # pre-evaluated time function 
+          mu[3] * base[i*T + j]+
+          ac[i*T + j] * (beta[1]+ 
+                           beta[2] * q[i*T + j] + # pre-evaluated time function
+                           beta[3] * base[i*T + j]+
+                           beta[4] * statec[i*T + j]+
+                           beta[5] * a[i*T + j - 1])+
+          ac[i*T + j - 1] * (beta[6]+
+                               beta[7] * tmod[j - 1]+
+                               beta[8] * base[i*T + j - 1]+
+                               beta[9] * state[i*T + j - 1])+
+          theta[1] * availc[i*T + j]+
+          theta[2] * state[i*T + j]+
+          theta[3] * availc[i*T + j - 1]+
+          theta[4] * statec[i*T + j - 1]
+        # error 
+        err[i*T + j] = err[i*T + j]+ coeferr * err[i*T + j - 1] 
+        # response 
+        y[i*T + j] = ym + err[i*T + j]
+      }
+    }
+    
+    d = data.frame(ty = ty, tmod = tmod, tavail = tavail, tstate = tstate,
+                   base = base, state = state, q = q, a = a, y = y, err = err,
+                   avail = avail, p = prob, a.center = ac,
+                   state.center = statec, avail.center = availc)
+    return(d)
+  }
+  
+  
   
   d <- rsnmm(
     n = as.integer(n) ,
@@ -217,6 +223,9 @@ rsnmm.R <- function(n, tmax, control, ...) {
   return(d)
 }
 
+
+# this function is the main simulator function, 
+# It will produce 1000 Monte Carlo replicates comparing the WCLS estimator as well as proposed A2-WCLS estimator
 sim_wc <- function(n = 100, tmax = 30, M = 1000,
                    ## response regression models
                    y.formula = list(w = y ~ state + I(a - pn),
@@ -224,9 +233,9 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
                    contrast_vec = list(w = c(0,0,1),
                                        u = c(0,0,1,0)),
                    y.moderator = list(w = "None", 
-                                      u = "Centered State"),
+                                      u = "A2-WCLS"),
                    ## names for each regression model
-                   y.names = c(w = "Weighted and centered"),
+                   y.names = c(w = "Causal Excursion Effect"),
                    ## labels for regression terms of the treatment effect
                    y.label = list(w = "I(a - pn)"),
                    ## names of the treatment probability models or variables used
@@ -367,20 +376,11 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
           T = tmax+1-runin.fity
           #### change the V base here
           
-          # III: only constant model
+          # centering parameter (the intercept only model)
           v_base = matrix(rep(c(1,0),c(T,(T-1)*T)),nrow = T,ncol = T)
-          
-          # V
-          # # linear function of time
-          # v_base = matrix(0,nrow = T, ncol=T)
-          # v_base[,1] =1
-          # v_base[,2] = 1:T
-          
-          
           centering_model<- do.call(lm.wfit, list(x = v_base[rep(1:nrow(v_base),times = n),],
                                                   y = d[r, "state"],
                                                   w = w*(l$x[,3])^2))
-          
           
           if (!inherits(centering_model, "geeglm")){
             centering_model <- glm2gee(centering_model, d$id[r])

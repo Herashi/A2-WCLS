@@ -13,7 +13,8 @@ This repository contains the R code used to generate the simulation experiments 
 1.  Locate the relevant folder; 
 2.  Install all required packages;
 2.  Reset `setwd("")` for `sim-omit.R`;
-3.  Run the `sim-omit.R` script.
+3.  Run the `sim-omit.R` script. (NB: each Monte Carlo replication takes approximately 2–3 minutes, so we strongly recommend using parallel computing to speed up the simulation.)
+
 
 Each folder is self-contained, meaning all necessary files to generate specific tables for each section are included within the folder. Take the **Main Simulation Results** as an example:
 

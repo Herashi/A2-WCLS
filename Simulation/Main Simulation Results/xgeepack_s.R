@@ -2,21 +2,28 @@
 
 library(popbio)
 
-new_meat = function(l,x,wcovinv = NULL,...){
+
+# For the meat term of the sandwich estimator
+# assuming that estimating the centering parameters would add on extra variance. 
+meat_function = function(l,x,wcovinv = NULL,...){
   if (is.null(wcovinv)) wcovinv <- working.covariance(x, invert = TRUE)
-  ## nb: small sample correction threshold can be set via '...'
-  ##     no correction is applied to the estimating functions from 'pd' and 'pn'
+  ## no correction is applied to the estimating functions from 'pd' and 'pn'
   u <- estfun.geeglm(x, wcovinv = wcovinv, res = TRUE, ...)
   u <- u$estfun
   n <- cluster.number(x, overall = FALSE)
   
+  #design matrix
   df = as.data.frame(l$x)
+  # W_t, the stabilizing weight
   w = l$w
+  # estimated coefficient
   beta_1 = x[["coefficients"]][["I((a - pn) * (state - statet))"]]
+  # model residual epsilon^{A2}
   res = x[["residuals"]]
+  # the centering function 
   v_base = x$v_base
 
-  # make a copy of df
+  # calculating the extra variance introduced by estimating the centering parameters
   terms_df = df
   df$`I(state - statet)` = df$`I((a - pn) * (state - statet))`/df$`I(a - pn)`
   terms_df[,1] = beta_1*w*df$`I(a - pn)`
@@ -24,17 +31,13 @@ new_meat = function(l,x,wcovinv = NULL,...){
   terms_df[,3] = beta_1*w*df$`I(a - pn)`^2
   terms_df[,4] = -res*w*df$`I(a - pn)` + beta_1*w*df$`I(a - pn)`^2*df$`I(state - statet)`
   
-
+  
   m <- mapply(function(S) t(S) %*% v_base,
               S = split.data.frame(terms_df, x$id),
               SIMPLIFY = FALSE)
-
   Sigma <- mean.list(m)
-
-
   expec = w*df$`I(a - pn)`^2
   e = split(expec, x$id)
-  ### try to improve later
   v2 = array(NA, dim = c(nrow(v_base), dim(v_base)))
   for (i in 1:dim(v2)[1]){
     v2[i,,] = as.matrix(v_base[i,]) %*% v_base[i,]
@@ -46,24 +49,23 @@ new_meat = function(l,x,wcovinv = NULL,...){
       E_u = E_u + v2[j,,] * e[[i]][j]
     }
   }
-
-  # E_inv = solve(-E_u/n)
   E_inv = ginv(-E_u/n)
-  ###
 
   U_e = mapply(function(S) colSums(S*v_base),
                S = split(df$`I(state - statet)`*expec, x$id),
                SIMPLIFY = FALSE)
   e <- do.call("rbind", U_e)
-
   
   Sigma_E_U <- e%*%E_inv%*%t(Sigma)
+  
   u_final= t(u-Sigma_E_U)%*%(u-Sigma_E_U)
   
   return(u_final)
 }
 
 
+# This is the function calculating meat term when there is no extra variance
+# plus it can also perform small sample correction
 meat.geeglm <- function(x, pn = NULL, pd = pn, lag = 0, wcovinv = NULL,
                         label = NULL, correct.all = TRUE, ...) {
   if (is.null(wcovinv)) wcovinv <- working.covariance(x, invert = TRUE)
@@ -442,7 +444,7 @@ vcov.geeglm <- function(l,x,moderator,...) {
     w <- working.covariance(x, invert = TRUE)
     b <- bread.geeglm(x, wcovinv = w)
     if(moderator != "None"){
-      m <- new_meat(l,x)
+      m <- meat_function(l,x)
     }else{
       m <- meat.geeglm(x, wcovinv = w, ...)
     }

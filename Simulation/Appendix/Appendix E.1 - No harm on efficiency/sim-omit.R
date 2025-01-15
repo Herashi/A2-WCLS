@@ -19,6 +19,7 @@ clusterEvalQ(cl, source("init.R"))
 registerDoParallel(cl)
 
 
+
 sim.omit <- function() {
   out <- NULL
   ## here the state is in fact not an effect moderator
