@@ -35,16 +35,17 @@ sim.omit <- function() {
                                                  u = c(0,0,1,0)),
                              # the non-adjusted method versus the A2-WCLS auxiliary variable adjusted approach
                              y.moderator = list(w = "None", 
-                                                u = "moderator"),
+                                                u = "state"),
                              y.names = c(w = "Causal Excursion Effect"),
                              ## term labels for proximal treatment
-                             y.label = list(w = "I(a - pn)"),
+                             y.label = list(w = "I(lag1a - pn)"),
                              ## specify weights and working correlation structure
                              y.args = list(w = list(wn = "pn", wd = "prob")),
                              ## specify weight numerator model
                              a.formula = list(pn = a ~ 1),
                              a.names = c(pn = "intercept-only"),
                              ## use default generative model, but with the specified
+                             lag = 1,
                              ## level of moderation by the time-varying state
                              # \beta_10 + \beta_11 E(S_t)
                              true_effect = -0.1,
