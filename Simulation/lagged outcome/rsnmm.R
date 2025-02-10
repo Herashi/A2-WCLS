@@ -447,7 +447,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   
   out_w = out[seq(1,2*M-1,by = 2),]
   ## 95% CI coverage probability using uncorrected SEs
-  out_w$cp <- with(out_w, lcl <= true_effect & true_effect <= ucl)
+  # out_w$cp <- with(out_w, lcl <= true_effect & true_effect <= ucl)
   ## coverage probability using SEs corrected for estimates in weights
   out_w$cpc <- with(out_w, lclc <= true_effect & true_effect <= uclc)
   ## root MSE
@@ -455,7 +455,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   
   
   ## mean and SD estimate, number of replicates
-  out_w <- cbind(aggregate(cbind(est,estc, se, sec, cp, cpc, rmse,lclc, uclc) ~
+  out_w <- cbind(aggregate(cbind(estc, sec, cpc, rmse,lclc, uclc) ~
                              method + moderator +  n + tmax,
                            data = out_w, FUN = mean),
                  sd = aggregate(estc ~ method + moderator + n + tmax,
@@ -470,7 +470,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   out_u = out[seq(2,2*M,by = 2),]
   
   ## 95% CI coverage probability using uncorrected SEs
-  out_u$cp <- with(out_u, lcl <= true_effect & true_effect <= ucl)
+  # out_u$cp <- with(out_u, lcl <= true_effect & true_effect <= ucl)
   ## coverage probability using SEs corrected for estimates in weights
   out_u$cpc <- with(out_u, lclc <= true_effect & true_effect <= uclc)
   ## root MSE
@@ -478,7 +478,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   
   
   ## mean and SD estimate, number of replicates
-  out_u <- cbind(aggregate(cbind(est,estc, se, sec, cp, cpc, rmse,lclc, uclc) ~
+  out_u <- cbind(aggregate(cbind(estc, sec, cpc, rmse,lclc, uclc) ~
                              method + moderator +  n + tmax,
                            data = out_u, FUN = mean),
                  sd = aggregate(estc ~ method + moderator + n + tmax,
