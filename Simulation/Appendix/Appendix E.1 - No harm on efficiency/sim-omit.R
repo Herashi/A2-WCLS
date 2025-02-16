@@ -21,7 +21,7 @@ registerDoParallel(cl)
 sim.omit <- function() {
   out <- NULL
   ## low, medium and high degrees of moderation by state
-  for (b in 0.8) {
+  for (b in 0) {
     for (n in 250) {
       for (tmax in 30) {
         clusterSetRNGStream(cl, seed)

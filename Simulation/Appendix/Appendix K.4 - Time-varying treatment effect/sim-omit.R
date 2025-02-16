@@ -29,11 +29,11 @@ sim.omit <- function() {
                      ## regress response on state and proximal treatment,
                      ## ignoring the underlying interaction between the two
                      y.formula = list(w = y ~ state + I(a - pn) + I((a - pn) * time),
-                                      u = y ~ state + I(a - pn) + I((a - pn) * time) + I((a - pn) * (state - statet)) ),
+                                      u = y ~ state + I(a - pn) + I((a - pn) * time) + I((a - pn) * (state - state_mod)) ),
                      contrast_vec = list(w = list(c(0,0,1,0), c(0,0,0,1)),
                                          u = list(c(0,0,1,0,0),c(0,0,0,1,0))),
                      y.moderator = list(w = "None", 
-                                        u = "Centered State"),
+                                        u = "state"),
                      y.names = c(w = "Weighted and centered"),
                      ## term labels for proximal treatment
                      y.label = list(w = "I(a - pn)"),
