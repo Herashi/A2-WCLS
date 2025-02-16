@@ -10,21 +10,22 @@ library(geepack)
 
 
 
+
 #define expit(a)
 expit = function(a){
   return(exp(a) / (1 + exp(a)))
 }
 
 
+
 # stores all the key parameters settings for generating the observations
 rsnmm.control <- function(origin = 1, sd = 1,
                           coralpha = sqrt(0.5),
                           corstr = c("ar1", "exchangeable"),
-                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = c(-0.1,0,0,0),
-                          eta = c(0, 0, 0.8, -0.8, 0),# eta = rep(0,5) , 
-                          mu = rep(0, 3),
+                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = c(-0.1,0,0,0.5),
+                          eta = c(0, 0, 0, 0, 0), mu = rep(0, 3),
                           theta0 = c(0, 0.8), theta1 = c(0, 0),
-                          coef.avail = c(100, rep(0, 3)), coef.state = rep(0, 5),
+                          coef.avail = c(100, rep(0, 3)), coef.state = rep(0,5) ,
                           tfun = NULL, lag = 3 + any(beta1 != 0)) {
   corstr <- match.arg(corstr)
   if (is.null(tfun))
@@ -132,7 +133,7 @@ rsnmm.R <- function(n, tmax, control, ...) {
                                                + eta[5] * y[i*T + j - 1])
         
         # treatment indicator - uncentered and centered 
-        a[i*T + j] = as.numeric(rbinom(1,1, prob[i*T + j]))
+        a[i*T + j] = as.numeric(rbinom(1,1,prob[i*T + j]))
         ac[i*T + j] = a[i*T + j] - prob[i*T + j]
         # conditional mean response 
         ym = mu[1]+ 
@@ -146,7 +147,8 @@ rsnmm.R <- function(n, tmax, control, ...) {
           ac[i*T + j - 1] * (beta[6]+
                                beta[7] * tmod[j - 1]+
                                beta[8] * base[i*T + j - 1]+
-                               beta[9] * state[i*T + j - 1])+
+                               # beta[9] * state[i*T + j - 1])+
+                               beta[9] * state[i*T + j])+
           theta[1] * availc[i*T + j]+
           theta[2] * state[i*T + j]+
           theta[3] * availc[i*T + j - 1]+
@@ -224,6 +226,7 @@ rsnmm.R <- function(n, tmax, control, ...) {
 }
 
 
+
 # this function is the main simulator function, 
 # It will produce 1000 Monte Carlo replicates comparing the WCLS estimator as well as proposed A2-WCLS estimator
 sim_wc <- function(n = 100, tmax = 30, M = 1000,
@@ -267,7 +270,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   ##     moderator has conditional mean zero
   y.coef <- mapply(which.terms, x = y.formula, label = y.label,
                    stripnames = TRUE, SIMPLIFY = FALSE)
-
+  
   ## corresponding treatment probability models
   ## nb: we avoid delayed evaluation in 'y.args' (e.g. passing a 'weights'
   ##     argument directly) to avoid scoping issues in 'foreach'
@@ -330,53 +333,56 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
       d[r, newvar[1]] <- fit$fitted.values
       d[, newvar[2]] <- delay(d$id, d$time, d[, newvar[1]])
     }else {
-      if (length(prob)){
-        d[, args[["w"]][["wn"]]] = unique(fita[["fitted.values"]])
-        d[, paste0("lag1", args[["w"]][["wn"]])] <- delay(d$id, d$time, d[, args[["w"]][["wn"]]])
-        # update the model matrix
-        w <- ifelse(d[, "a"] == 1, d[, args[["w"]][["wn"]]]/ d[, args[["w"]][["wd"]]],
-                    (1 - d[, args[["w"]][["wn"]]]) / (1 - d[, args[["w"]][["wd"]]]))
-
-        if (lag){
-          w <- delay(d[,"id"], d[,"time"], w, lag)
-        }
-        w <- w[r]
-        w <- w * d[r, "avail"]
+      d[, args[["w"]][["wn"]]] = unique(fita[["fitted.values"]])
+      d[, paste0("lag1", args[["w"]][["wn"]])] <- delay(d$id, d$time, d[, args[["w"]][["wn"]]])
+      # update the model matrix
+      w <- ifelse(d[, "a"] == 1, d[, args[["w"]][["wn"]]]/ d[, args[["w"]][["wd"]]],
+                  (1 - d[, args[["w"]][["wn"]]]) / (1 - d[, args[["w"]][["wd"]]]))
+      
+      if (lag){
+        w <- delay(d[,"id"], d[,"time"], w, lag)
+      }
+      w <- w[r]
+      w <- w * d[r, "avail"]
+      
+      
+      if (moderator != "None"){
         
+        weights =  w *(d[r,"a"] - d[r, args[["w"]][["wn"]]] )^2
         
-        if (moderator != "None"){
-
-          if(lag){
-            # intercept centering
-            centering_model<- do.call(lm.wfit, list(x = matrix(d[r,"lag1a"] -d[r,"lag1pn"]),
-                                                    y = d[r, moderator],
-                                                    w =  w))
-            
-            if (!inherits(centering_model, "geeglm")){
-              centering_model <- glm2gee(centering_model, d$id[r])
-            }
-            
-            d[r,"state_int"] = centering_model[["fitted.values"]]
-          }
-
-          
-          # moderator centering
-          weights = d[r,args[["w"]][["wn"]]]*(1-d[r,args[["w"]][["wn"]]])
-          centering_model<- do.call(lm.wfit, list(x = matrix(d[r,"one"]),
+        if(lag){
+          # intercept centering
+          centering_model<- do.call(lm.wfit, list(x = matrix(d[r,"lag1a"] - d[r,"lag1pn"]),
                                                   y = d[r, moderator],
-                                                  w = weights))
+                                                  w =  w))
           
           if (!inherits(centering_model, "geeglm")){
             centering_model <- glm2gee(centering_model, d$id[r])
           }
           
-          d[r,"state_mod"] = centering_model[["fitted.values"]]
+          d[r,"state_int"] = centering_model[["fitted.values"]]
+          
+          weights =  w *(d[r,"lag1a"] - d[r, paste0("lag1", args[["w"]][["wn"]])] )^2
+          
         }
         
-        l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
-        l$w = w
         
-      } 
+        # moderator centering
+        centering_model<- do.call(lm.wfit, list(x = matrix(d[r,"one"]),
+                                                y = d[r, moderator],
+                                                w = weights))
+        
+        if (!inherits(centering_model, "geeglm")){
+          centering_model <- glm2gee(centering_model, d$id[r])
+        }
+        
+        d[r,"state_mod"] = centering_model[["fitted.values"]]
+        
+        
+      }
+      l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
+      
+      l$w = w
       # refit the model
       
       fit <- do.call(fun, l)
@@ -387,9 +393,10 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
         fit$y <- l$y
         fit$terms <- terms(formula)
         fit$lag = lag
+        fit$label = label$w
       }
       
-      fit$vcov <- vcov.geeglm(l,x=fit, moderator= moderator, c_vec)
+      fit$vcov <- vcov.geeglm(l,x=fit, moderator= moderator)
       estc <- estimate(fit, rbind("Average treatment effect" = c_vec))[,1:4]
       fit <- data.frame(moderator = moderator,
                         # est = est["Estimate"], se = est["SE"],
@@ -410,10 +417,11 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   out <- foreach(m = 1:M, .combine = "rbind") %dopar% {
     d <- rsnmm.R(n, tmax, control = control)
     d$pn <- d$pd <- d$prob
+    d$lag1pn = with(d, delay(id, time, pn))
     
     # the centering parameter will be calculated later
-    d$state_int = 0
-    d$state_mod = 0
+    d$state_int = d$state_mod = 0
+    
     
     ## ... fit treatment probability models
     if (!is.null(a.formula)){

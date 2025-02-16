@@ -21,15 +21,15 @@ start_time <- Sys.time()  # Record start time
 sim.omit <- function() {
   out <- NULL
   ## low, medium and high degrees of moderation by state
-  for (b in 0.2) {
+  for (b in 0.8) {
     for (n in 250) {
       for (tmax in 30) {
         clusterSetRNGStream(cl, seed)
         out <-sim_wc(n, tmax, M, 
                              ## regress response on state and proximal treatment,
                              ## ignoring the underlying interaction between the two
-                             y.formula = list(w = y ~ I(lag1a - pn),
-                                              u = y ~ I(state - state_int) + I(lag1a - pn) + I((lag1a - pn) * (state - state_mod))),
+                             y.formula = list(w = y ~ I(lag1a - lag1pn),
+                                              u = y ~ I(state - state_int) + I(lag1a - lag1pn) + I((lag1a - lag1pn) * (state - state_mod))),
                              # to extract the coefficients of interest from the fitted model above
                              contrast_vec = list(w = c(0,1),
                                                  u = c(0,0,1,0)),
@@ -38,11 +38,11 @@ sim.omit <- function() {
                                                 u = "state"),
                              y.names = c(w = "Causal Excursion Effect"),
                              ## term labels for proximal treatment
-                             y.label = list(w = "I(lag1a - pn)"),
+                             y.label = list(w = "I(lag1a - lag1pn)"),
                              ## specify weights and working correlation structure
                              y.args = list(w = list(wn = "pn", wd = "prob")),
                              ## specify weight numerator model
-                             a.formula = list(pn = a ~ 1),
+                             a.formula = list(pn = lag1a ~ 1),
                              a.names = c(pn = "intercept-only"),
                              ## use default generative model, but with the specified
                              lag = 1,

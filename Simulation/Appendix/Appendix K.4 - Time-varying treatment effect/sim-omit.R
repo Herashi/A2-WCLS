@@ -1,12 +1,7 @@
-setwd("~/time-varying-sim")
-library("foreach")
-library("doParallel")
-library("parallel")
+setwd("~/Documents")
+# loading packages
 source("init.R")
-if(!require(popbio)){
-  install.packages("popbio")
-  library(popbio)
-}
+
 
 ## set number of Monte Carlo replicates
 M <- 1000
@@ -56,11 +51,8 @@ sim.omit <- function() {
   out
 }
 
-
-
-
 omit <- sim.omit()
 
-save(omit,file = "test_250_30_t.RData")
+save(omit,file = "test.RData")
 
 stopCluster(cl)

@@ -1,7 +1,5 @@
 setwd("~/Documents")
-library("foreach")
-library("doParallel")
-library("parallel")
+# loading packages
 source("init.R")
 
 
@@ -19,37 +17,41 @@ clusterEvalQ(cl, source("init.R"))
 registerDoParallel(cl)
 
 
+## the main simulation functions
 sim.omit <- function() {
   out <- NULL
   ## low, medium and high degrees of moderation by state
-  for (b in 0.2) {
+  for (b in 0.8) {
     for (n in 250) {
-      group = group_all[[as.character(n)]]
       for (tmax in 30) {
         clusterSetRNGStream(cl, seed)
         out <-sim_wc(n, tmax, M, 
-                             ## regress response on state and proximal treatment,
-                             ## ignoring the underlying interaction between the two
-                             y.formula = list(w = y ~ state + I(a - pn),
-                                              u = y ~ state + I(a - pn) + I((a - pn) * (state - statet)) ),
-                             contrast_vec = list(w = c(0,0,1),
-                                                 u = c(0,0,1,0)),
-                             y.moderator = list(w = "None", 
-                                                u = "Centered State"),
-                             y.names = c(w = "Weighted and centered"),
-                             ## term labels for proximal treatment
-                             y.label = list(w = "I(a - pn)"),
-                             ## specify weights and working correlation structure
-                             y.args = list(w = list(wn = "pn", wd = "prob")),
-                             ## specify weight numerator model
-                             a.formula = list(pn = a ~ 1),
-                             a.names = c(pn = "intercept-only"),
-                             ## use default generative model, but with the specified
-                             ## level of moderation by the time-varying state
-                             # \beta_10 + \beta_11 E(S_t)
-                             true_effect = -0.2,
-                             group_ls = group,
-                             beta0 = c(-0.2, 0, 0, b, 0))
+                     ## regress response on state and proximal treatment,
+                     ## ignoring the underlying interaction between the two
+                     y.formula = list(w = y ~ state + I(a - pn),
+                                      u = y ~ state + I(a - pn) + I((a - pn) * (state - state_mod)) ),
+                     # to extract the coefficients of interest from the fitted model above
+                     contrast_vec = list(w = c(0,0,1),
+                                         u = c(0,0,1,0)),
+                     # the non-adjusted method versus the A2-WCLS auxiliary variable adjusted approach
+                     y.moderator = list(w = "None", 
+                                        u = "state"),
+                     y.names = c(w = "Causal Excursion Effect"),
+                     ## term labels for proximal treatment
+                     y.label = list(w = "I(a - pn)"),
+                     ## specify weights and working correlation structure
+                     y.args = list(w = list(wn = "pn", wd = "prob")),
+                     ## specify weight numerator model
+                     a.formula = list(pn = a ~ 1),
+                     a.names = c(pn = "intercept-only"),
+                     ## use default generative model, but with the specified
+                     ## level of moderation by the time-varying state
+                     # \beta_10 + \beta_11 E(S_t)
+                     true_effect = -0.2,
+                     # the cluster structure
+                     # data generating parameter specification
+                     # varying b produces different level of moderation effect (small, medium, strong)
+                     beta0 = c(-0.2, 0, 0, b, 0))
       }
     }
   }
@@ -57,19 +59,7 @@ sim.omit <- function() {
 }
 
 
-
-
-omit <- sim.omit()
-
-out = omit[["out"]]
-out_u = out[seq(2,2*M,by = 2),]
-out_w = out[seq(1,2*M-1,by = 2),]
-df = out_w$sec - out_u$sec
-summary(df)
-hist(df)
-mean(df/out_w$sec)
-
-
-save(omit,file = "test.RData")
+out <- sim.omit()
+save(out,file = "test.RData")
 
 stopCluster(cl)

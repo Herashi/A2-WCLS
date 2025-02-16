@@ -43,6 +43,7 @@ delay <- function(id, time, x, k = 1) {
   b <- b[attributes(s)$uid][attributes(s)$order]
   z <- zoosplit(s)
   l <- lapply(z, function(y) lag(y, k = -k, na.pad = TRUE))
+  # l <- lapply(z, function(y) lag(y, k))
   attributes(l) <- attributes(z)
   l <- unzoosplit(l)
   l

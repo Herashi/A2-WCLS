@@ -1,6 +1,8 @@
 ## geepack and sandwich extras
 # For the sandwich estimator
-# assuming that estimating the centering parameters would add on extra variance. 
+# assuming that estimating the centering parameters would add on extra variance.
+
+
 stacking_meat = function(l,x = fit, wcovinv = NULL,...){
   if (is.null(wcovinv)) wcovinv <- working.covariance(x, invert = TRUE)
   ## no correction is applied to the estimating functions from 'pd' and 'pn'
@@ -10,36 +12,54 @@ stacking_meat = function(l,x = fit, wcovinv = NULL,...){
   
   w = l$w
   df = l$x
-  beta_1 = x[["coefficients"]]["I((lag1a - pn) * (state - state_mod))"]
-  
+  res = x$residuals
   
   if (x$lag){
-    U_est = matrix(0, nrow = n, ncol = 3)
+    beta_1 = x[["coefficients"]]["I((lag1a - lag1pn) * (state - state_mod))"]
+  }else{
+    beta_1 = x[["coefficients"]]["I((a - pn) * (state - state_mod))"]
+  }
+  
+  
+  E_dint_dtheta2 = mean(sapply(split(w*df[,x[["label"]]], x$id), sum))* beta_1
+  E_dz_dtheta2 = mean(sapply(split(w*df[,x[["label"]]]*df[,2], x$id), sum)) * beta_1
+  E_dbeta_dtheta2 = mean(sapply(split(w*df[,x[["label"]]]*df[,3], x$id), sum))  * beta_1
+  E_dza_dtheta2 = mean(sapply(split(-res*w*df[,x[["label"]]] +w*beta_1*df[,4]*df[,x[["label"]]], x$id), sum))
+  
+  
+  # weights = ifelse(df[,x[["label"]]]>0, df[,x[["label"]]]*(1-df[,x[["label"]]]), 
+  # -df[,x[["label"]]]*(1+df[,x[["label"]]]))
+  # E_dtheta2_theta2 = - mean(sapply(split(weights, x$id), sum))
+  
+  E_dtheta2_theta2 = -mean(sapply(split(w*df[,x[["label"]]]^2, x$id), sum))
+  U_theta2 = matrix(unname(sapply(split(w*df[,4]*df[,x[["label"]]], x$id), sum)))
+  
+  d_theta2 = matrix(c(E_dint_dtheta2,E_dz_dtheta2,E_dbeta_dtheta2,E_dza_dtheta2))
+  
+  
+  U_extra = U_theta2 %*% t(d_theta2) /E_dtheta2_theta2
+  
+  if (x$lag){
     alpha_1 = x[["coefficients"]]["I(state - state_int)"]
-    U_est[,1] = sapply(split(x[["residuals"]]*w*df[,3], x$id), sum)
-    U_est[,2] = sapply(split(w*df[,2]*df[,3], x$id), sum)
-    U_est[,3] = sapply(split(w*df[,4]*df[,3], x$id), sum)
-  }else{
-    U_est = matrix(0, nrow = n, ncol = 2)
-    U_est[,1] = sapply(split(x[["residuals"]]*w*df[,3], x$id), sum)
-    U_est[,2] = sapply(split(w*df[,4]*df[,3], x$id), sum)
+    
+    E_dint_dtheta1 = mean(sapply(split(w, x$id), sum))* alpha_1
+    E_dz_dtheta1 = mean(sapply(split(-res*w + w*alpha_1*df[,2], x$id), sum))
+    E_dbeta_dtheta1 = mean(sapply(split(w*df[,3], x$id), sum)) * alpha_1
+    E_dza_dtheta1 = mean(sapply(split(w*df[,4], x$id), sum)) * alpha_1
+    
+    E_dtheta1_theta1 = E_dtheta2_theta2
+    U_theta1 = matrix(unname(sapply(split(w*df[,"I(state - state_int)"]*df[,x[["label"]]], x$id), sum)))
+    
+    d_theta1 = matrix(c(E_dint_dtheta1,E_dz_dtheta1,E_dbeta_dtheta1,E_dza_dtheta1))
+    
+    U_extra = U_extra + U_theta1 %*% t(d_theta1)/E_dtheta1_theta1
   }
   
-  
-  if (x$lag){
-    bread_term = matrix(c(1,0,0,-alpha_1,1,0,-beta_1,0,1), nrow = 3)
-  }else{
-    bread_term = matrix(c(1,0,-beta_1,1), nrow = 2)
-  }
-  bread_inv = ginv(bread_term)
-  
-  # estimated variance
-
-  # u_final = bread_inv %*% (t(U_est) %*% U_est)%*% t(bread_inv)
-  u_final = t(bread_inv) %*% (t(U_est) %*% U_est)%*% bread_inv
+  u_final = t(u - U_extra) %*% (u - U_extra)
   
   return(u_final)
 }
+
 
 
 # This is the function calculating meat term when there is no extra variance
@@ -415,19 +435,18 @@ working.correlation <- function(x, ...) {
 
 ## calculate the sandwich estimator of the covariance matrix for the regression
 ## coefficients
-vcov.geeglm <- function(l,x,moderator,c_vec, ...) {
+vcov.geeglm <- function(l,x,moderator,...) {
   x <- gee.scalars(x)
   v <- x$vcov
   if (is.null(v)) {
-      w <- working.covariance(x, invert = TRUE)
-      b <- bread.geeglm(x, wcovinv = w)
+    w <- working.covariance(x, invert = TRUE)
+    b <- bread.geeglm(x, wcovinv = w)
+    if(moderator != "None"){
+      m <- stacking_meat(l,x)
+    }else{
       m <- meat.geeglm(x, wcovinv = w, ...)
-      
-      if(moderator != "None"){
-        m_extra <- stacking_meat(l,x)[1,1]
-        m[as.logical(c_vec),as.logical(c_vec)] = m_extra
-      }
-      v <- b %*% m %*% t(b)
+    }
+    v <- b %*% m %*% t(b)
   }
   v
 }

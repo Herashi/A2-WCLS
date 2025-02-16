@@ -21,21 +21,21 @@ registerDoParallel(cl)
 sim.omit <- function() {
   out <- NULL
   ## low, medium and high degrees of moderation by state
-  for (b in c(0.2, 0.5, 0.8)) {
+  for (b in 0.8) {
     for (n in 250) {
       for (tmax in 30) {
         clusterSetRNGStream(cl, seed)
-        out <-sim_wc(n, tmax, M, all_data = all_data,
+        out <-sim_wc(n, tmax, M, 
                              ## regress response on state and proximal treatment,
                              ## ignoring the underlying interaction between the two
                              y.formula = list(w = y ~ state + I(a - pn),
-                                              u = y ~ state + I(a - pn) + I((a - pn) * (state - statet)) ),
+                                              u = y ~ state + I(a - pn) + I((a - pn) * (state - state_mod)) ),
                              # to extract the coefficients of interest from the fitted model above
                              contrast_vec = list(w = c(0,0,1),
                                                  u = c(0,0,1,0)),
                              # the non-adjusted method versus the A2-WCLS auxiliary variable adjusted approach
                              y.moderator = list(w = "None", 
-                                                u = "A2-WCLS"),
+                                                u = "state"),
                              y.names = c(w = "Causal Excursion Effect"),
                              ## term labels for proximal treatment
                              y.label = list(w = "I(a - pn)"),
@@ -49,7 +49,6 @@ sim.omit <- function() {
                              # \beta_10 + \beta_11 E(S_t)
                              true_effect = -0.2,
                              # the cluster structure
-                             group_ls = NULL,
                              # data generating parameter specification
                              # varying b produces different level of moderation effect (small, medium, strong)
                              beta0 = c(-0.2, 0, 0, b, 0))

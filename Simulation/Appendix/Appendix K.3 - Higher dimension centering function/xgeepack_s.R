@@ -1,69 +1,70 @@
 ## geepack and sandwich extras
+# For the sandwich estimator
+# assuming that estimating the centering parameters would add on extra variance.
 
-library(popbio)
 
-new_meat = function(l,x,wcovinv = NULL,...){
+# l: the list containing the design matrix, weight and the outcome
+# x = fit is the fitted function
+stacking_meat = function(l,x = fit, wcovinv = NULL,...){
   if (is.null(wcovinv)) wcovinv <- working.covariance(x, invert = TRUE)
-  ## nb: small sample correction threshold can be set via '...'
-  ##     no correction is applied to the estimating functions from 'pd' and 'pn'
+  ## no correction is applied to the estimating functions from 'pd' and 'pn'
   u <- estfun.geeglm(x, wcovinv = wcovinv, res = TRUE, ...)
   u <- u$estfun
   n <- cluster.number(x, overall = FALSE)
   
-  df = as.data.frame(l$x)
   w = l$w
-  beta_1 = x[["coefficients"]][["I((a - pn) * (state - statet))"]]
-  res = x[["residuals"]]
-  v_base = x$v_base
-
-  # make a copy of df
-  terms_df = df
-  df$`I(state - statet)` = df$`I((a - pn) * (state - statet))`/df$`I(a - pn)`
-  terms_df[,1] = beta_1*w*df$`I(a - pn)`
-  terms_df[,2] = beta_1*w*df$`I(a - pn)`*df$state
-  terms_df[,3] = beta_1*w*df$`I(a - pn)`^2
-  terms_df[,4] = -res*w*df$`I(a - pn)` + beta_1*w*df$`I(a - pn)`^2*df$`I(state - statet)`
+  df = l$x
+  res = x$residuals
   
-
-  m <- mapply(function(S) t(S) %*% v_base,
-              S = split.data.frame(terms_df, x$id),
-              SIMPLIFY = FALSE)
-
-  Sigma <- mean.list(m)
-
-
-  expec = w*df$`I(a - pn)`^2
-  e = split(expec, x$id)
-  ### try to improve later
-  v2 = array(NA, dim = c(nrow(v_base), dim(v_base)))
-  for (i in 1:dim(v2)[1]){
-    v2[i,,] = as.matrix(v_base[i,]) %*% v_base[i,]
+  if (x$lag){
+    beta_1 = x[["coefficients"]]["I((lag1a - lag1pn) * (state - state_mod))"]
+  }else{
+    beta_1 = x[["coefficients"]]["I((a - pn) * (state - state_mod))"]
   }
-
-  E_u = matrix(0, nrow = nrow(v_base), ncol = ncol(v_base))
-  for (i in 1:n){
-    for (j in 1:length(e[[i]])){
-      E_u = E_u + v2[j,,] * e[[i]][j]
-    }
-  }
-
-  # E_inv = solve(-E_u/n)
-  E_inv = ginv(-E_u/n)
-  ###
-
-  U_e = mapply(function(S) colSums(S*v_base),
-               S = split(df$`I(state - statet)`*expec, x$id),
-               SIMPLIFY = FALSE)
-  e <- do.call("rbind", U_e)
-
   
-  Sigma_E_U <- e%*%E_inv%*%t(Sigma)
-  u_final= t(u-Sigma_E_U)%*%(u-Sigma_E_U)
+  
+  E_dint_dtheta2 = mean(sapply(split(w*df[,x[["label"]]], x$id), sum))* beta_1
+  E_dz_dtheta2 = mean(sapply(split(w*df[,x[["label"]]]*df[,2], x$id), sum)) * beta_1
+  E_dbeta_dtheta2 = mean(sapply(split(w*df[,x[["label"]]]*df[,3], x$id), sum))  * beta_1
+  E_dza_dtheta2 = mean(sapply(split(-res*w*df[,x[["label"]]] +w*beta_1*df[,4]*df[,x[["label"]]], x$id), sum))
+  
+  
+  # weights = ifelse(df[,x[["label"]]]>0, df[,x[["label"]]]*(1-df[,x[["label"]]]), 
+  # -df[,x[["label"]]]*(1+df[,x[["label"]]]))
+  # E_dtheta2_theta2 = - mean(sapply(split(weights, x$id), sum))
+  
+  E_dtheta2_theta2 = -mean(sapply(split(w*df[,x[["label"]]]^2, x$id), sum))
+  U_theta2 = matrix(unname(sapply(split(w*df[,4]*df[,x[["label"]]], x$id), sum)))
+  
+  d_theta2 = matrix(c(E_dint_dtheta2,E_dz_dtheta2,E_dbeta_dtheta2,E_dza_dtheta2))
+  
+  
+  U_extra = U_theta2 %*% t(d_theta2) /E_dtheta2_theta2
+  
+  if (x$lag){
+    alpha_1 = x[["coefficients"]]["I(state - state_int)"]
+    
+    E_dint_dtheta1 = mean(sapply(split(w*df[,x[["label"]]], x$id), sum))* alpha_1
+    E_dz_dtheta1 = mean(sapply(split(-res*df[,x[["label"]]]*w + w*alpha_1*df[,x[["label"]]]*df[,2], x$id), sum))
+    E_dbeta_dtheta1 = mean(sapply(split(w*df[,x[["label"]]]*df[,3], x$id), sum)) * alpha_1
+    E_dza_dtheta1 = mean(sapply(split(w*df[,x[["label"]]]*df[,4], x$id), sum)) * alpha_1
+    
+    E_dtheta1_theta1 = E_dtheta2_theta2
+    U_theta1 = matrix(unname(sapply(split(w*df[,"I(state - state_int)"]*df[,x[["label"]]], x$id), sum)))
+    
+    d_theta1 = matrix(c(E_dint_dtheta1,E_dz_dtheta1,E_dbeta_dtheta1,E_dza_dtheta1))
+    
+    U_extra = U_extra + U_theta1 %*% t(d_theta1)/E_dtheta1_theta1
+  }
+  
+  u_final = t(u - U_extra) %*% (u - U_extra)
   
   return(u_final)
 }
 
 
+# This is the function calculating meat term when there is no extra variance
+# plus it can also perform small sample correction
 meat.geeglm <- function(x, pn = NULL, pd = pn, lag = 0, wcovinv = NULL,
                         label = NULL, correct.all = TRUE, ...) {
   if (is.null(wcovinv)) wcovinv <- working.covariance(x, invert = TRUE)
@@ -442,7 +443,7 @@ vcov.geeglm <- function(l,x,moderator,...) {
     w <- working.covariance(x, invert = TRUE)
     b <- bread.geeglm(x, wcovinv = w)
     if(moderator != "None"){
-      m <- new_meat(l,x)
+      m <- stacking_meat(l,x)
     }else{
       m <- meat.geeglm(x, wcovinv = w, ...)
     }
