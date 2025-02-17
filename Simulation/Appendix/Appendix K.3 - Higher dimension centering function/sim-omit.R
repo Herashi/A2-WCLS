@@ -30,6 +30,9 @@ sim.omit <- function() {
                      ## ignoring the underlying interaction between the two
                      y.formula = list(w = y ~ state + I(a - pn),
                                       u = y ~ state + I(a - pn) + I((a - pn) * (state - state_mod)) ),
+                     # the feature vector of the centering function
+                     centering.base = list( w = NULL,
+                                            u = c("one","time")),
                      # to extract the coefficients of interest from the fitted model above
                      contrast_vec = list(w = c(0,0,1),
                                          u = c(0,0,1,0)),

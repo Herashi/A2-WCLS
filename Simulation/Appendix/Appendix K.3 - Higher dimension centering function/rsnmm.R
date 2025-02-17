@@ -232,6 +232,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
                    ## response regression models
                    y.formula = list(w = y ~ state + I(a - pn),
                                     u = y ~ I(state-statec) * I(a - pn)),
+                   centering.base = list( u = "one"),
                    contrast_vec = list(w = c(0,0,1),
                                        u = c(0,0,1,0)),
                    y.moderator = list(w = "None", 
@@ -301,7 +302,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   ## general model fitter
   ## nb: d is the data frame for the replicate
   fitter <- function(formula, args, prob, coef, label, response = "y",
-                     addvar = NULL,c_vec, moderator) {
+                     addvar = NULL,c_vec, moderator, base) {
     if (response == "y") {
       runin <- runin.fity
     }else{
@@ -367,9 +368,16 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
         
         
         # moderator centering
-        centering_model<- do.call(lm.wfit, list(x = matrix(c(d[r,"one"], d[r,"time"]), ncol = 2),
-                                                y = d[r, moderator],
-                                                w = weights))
+        if(length(base)>1){
+          centering_model<- do.call(lm.wfit, list(x = d[r,base],
+                                                  y = d[r, moderator],
+                                                  w = weights))
+        }else{
+          centering_model<- do.call(lm.wfit, list(x = matrix(d[r,base]),
+                                                  y = d[r, moderator],
+                                                  w = weights))
+        }
+        
         
         if (!inherits(centering_model, "geeglm")){
           centering_model <- glm2gee(centering_model, d$id[r])
@@ -393,6 +401,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
         fit$terms <- terms(formula)
         fit$lag = lag
         fit$label = label$w
+        fit$base = base
       }
       
       fit$vcov <- vcov.geeglm(l,x=fit, moderator= moderator)
@@ -432,11 +441,11 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
     
     fity_w <- fitter(formula = y.formula[["w"]], args = y.args, prob = y.prob,
                      coef = y.coef, label = y.label, c_vec= contrast_vec[["w"]],
-                     moderator = y.moderator[["w"]])
+                     moderator = y.moderator[["w"]], base = centering.base$w)
     
     fity_u <- fitter(formula = y.formula[["u"]], args = y.args, prob = y.prob,
                      coef = y.coef, label = y.label,c_vec= contrast_vec[["u"]],
-                     moderator = y.moderator[["u"]])
+                     moderator = y.moderator[["u"]], base = centering.base$u)
     
     fity = rbind(fity_w,fity_u)
     

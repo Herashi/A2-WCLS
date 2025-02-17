@@ -10,95 +10,22 @@ library(geepack)
 
 
 
+
 #define expit(a)
 expit = function(a){
   return(exp(a) / (1 + exp(a)))
 }
 
 
-rsnmm = function(n, T,
-                 ty, tmod, tavail, tstate,
-                 beta, eta, mu, theta,
-                 coefavail, coefstate, coeferr,
-                 avail, base, state, a, prob,
-                 y, err, q, statec, ac, availc){
-  
-  for (i in 0:(n-1)) {
-    for (j in 2:T) {
-      # probability of availabilty 
-      r = expit(coefavail[1]
-                + coefavail[2] * tavail[j]
-                + coefavail[3] * a[i*T + j-1]
-                + coefavail[4] * y[i*T + j-1])
-      # availability - uncentered and centered 
-      avail[i*T + j] = as.numeric(rbernoulli(1,r))
-      availc[i*T + j] = avail[i*T + j] - r
-      
-      # overwrite the q vector as a time indicator
-      #true effect now is -0.2 + 0.01 *(j-1) 
-      q[i*T + j] = j-1 
-     
-      # mean of the time-varying state variable
-      q_state = coefstate[1]*(j-1)
-      + coefstate[2] * tstate[j]
-      + coefstate[3] * base[i*T + j-1 ]
-      + coefstate[4] * state[i*T + j-1]
-      + coefstate[5] * a[i*T + j-1]
-      
-      # state follows a uniform distribution where the variance is also varying over time
-      state[i*T + j] = runif(1, min = q_state - 0.01*j, max = q_state + 0.01*j)
-      statec[i*T + j] = state[i*T + j]  - q_state 
-      
-      # treatment probability 
-      prob[i*T + j] = avail[i*T + j] * expit(eta[1]
-                                             + eta[2] * base[i*T + j]
-                                             + eta[3] * state[i*T + j]
-                                             + eta[4] * a[i*T + j - 1]
-                                             + eta[5] * y[i*T + j - 1])
-      
-      # treatment indicator - uncentered and centered 
-      a[i*T + j] = as.numeric(rbernoulli(1, prob[i*T + j]))
-      ac[i*T + j] = a[i*T + j] - prob[i*T + j]
-      # conditional mean response 
-      ym = mu[1]+ 
-        mu[2] * ty[j]+  # pre-evaluated time function 
-        mu[3] * base[i*T + j]+
-        ac[i*T + j] * (beta[1]+ 
-                         beta[2] * q[i*T + j] + # pre-evaluated time function
-                         beta[3] * base[i*T + j]+
-                         beta[4] * statec[i*T + j]+
-                         beta[5] * a[i*T + j - 1])+
-        ac[i*T + j - 1] * (beta[6]+
-                             beta[7] * tmod[j - 1]+
-                             beta[8] * base[i*T + j - 1]+
-                             beta[9] * state[i*T + j - 1])+
-        theta[1] * availc[i*T + j]+
-        theta[2] * state[i*T + j]+
-        theta[3] * availc[i*T + j - 1]+
-        theta[4] * statec[i*T + j - 1]
-      # error 
-      err[i*T + j] = err[i*T + j]+ coeferr * err[i*T + j - 1] 
-      # response 
-      y[i*T + j] = ym + err[i*T + j]
-    }
-  }
-  
-  d = data.frame(ty = ty, tmod = tmod, tavail = tavail, tstate = tstate,
-                 base = base, state = state, q = q, a = a, y = y, err = err,
-                 avail = avail, p = prob, a.center = ac,
-                 state.center = statec, avail.center = availc)
-  return(d)
-}
 
-
-
+# stores all the key parameters settings for generating the observations
 rsnmm.control <- function(origin = 1, sd = 1,
                           coralpha = sqrt(0.5),
                           corstr = c("ar1", "exchangeable"),
-                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = rep(0, 4),
-                          eta = c(0, 0, 0.8, -0.8, 0), mu = rep(0, 3),
+                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = c(-0.1,0,0,0.5),
+                          eta = c(0, 0, 0, 0, 0), mu = rep(0, 3),
                           theta0 = c(0, 0.8), theta1 = c(0, 0),
-                          coef.avail = c(100, rep(0, 3)), coef.state = c(0.05,0,0,0,0.1) ,
+                          coef.avail = c(100, rep(0, 3)), coef.state = c(-0.1,0,0,0,0) ,
                           tfun = NULL, lag = 3 + any(beta1 != 0)) {
   corstr <- match.arg(corstr)
   if (is.null(tfun))
@@ -129,7 +56,10 @@ rsnmm.control <- function(origin = 1, sd = 1,
 }
 
 
-
+# Generate the full dataset
+# A wrapper function containing both rsnmm.control and rsnmm
+# n: sample size 
+# tmax = T + runin
 rsnmm.R <- function(n, tmax, control, ...) {
   control <- if (missing(control)) rsnmm.control(...)
   else do.call("rsnmm.control", control)
@@ -164,6 +94,79 @@ rsnmm.R <- function(n, tmax, control, ...) {
                     sd = sqrt(q_sd^2 * (1 - corq^2))))
   q[time == 0] <- rnorm(n, sd = q_sd)
   #######
+  
+  # Generate the simulation data set with given parameters
+  rsnmm = function(n, T,
+                   ty, tmod, tavail, tstate,
+                   beta, eta, mu, theta,
+                   coefavail, coefstate, coeferr,
+                   avail, base, state, a, prob,
+                   y, err, q, statec, ac, availc){
+    
+    for (i in 0:(n-1)) {
+      for (j in 2:T) {
+        # probability of availabilty 
+        r = expit(coefavail[1]
+                  + coefavail[2] * tavail[j]
+                  + coefavail[3] * a[i*T + j-1]
+                  + coefavail[4] * y[i*T + j-1])
+        # availability - uncentered and centered 
+        avail[i*T + j] = as.numeric(rbinom(1,1,r))
+        availc[i*T + j] = avail[i*T + j] - r
+        
+        # probability that binary state is +1
+        q_state = expit(coefstate[1]*(j-1)
+                        + coefstate[2] * tstate[j]
+                        + coefstate[3] * base[i*T + j-1 ]
+                        + coefstate[4] * state[i*T + j-1]
+                        + coefstate[5] * a[i*T + j-1])
+        
+        # binary state on {-1, 1} - uncentered and centered
+        state[i*T + j] = ifelse(as.numeric(rbinom(1,1,q_state)) < 1 ,-1 ,1)
+        statec[i*T + j] = state[i*T + j] - (q_state - (1 - q_state))
+        
+        # treatment randomization probability 
+        prob[i*T + j] = avail[i*T + j] * expit(eta[1]
+                                               + eta[2] * base[i*T + j]
+                                               + eta[3] * state[i*T + j]
+                                               + eta[4] * a[i*T + j - 1]
+                                               + eta[5] * y[i*T + j - 1])
+        
+        # treatment indicator - uncentered and centered 
+        a[i*T + j] = as.numeric(rbinom(1,1,prob[i*T + j]))
+        ac[i*T + j] = a[i*T + j] - prob[i*T + j]
+        # conditional mean response 
+        ym = mu[1]+ 
+          mu[2] * ty[j]+  # pre-evaluated time function 
+          mu[3] * base[i*T + j]+
+          ac[i*T + j] * (beta[1]+ 
+                           beta[2] * q[i*T + j] + # pre-evaluated time function
+                           beta[3] * base[i*T + j]+
+                           beta[4] * statec[i*T + j]+
+                           beta[5] * a[i*T + j - 1])+
+          ac[i*T + j - 1] * (beta[6]+
+                               beta[7] * tmod[j - 1]+
+                               beta[8] * base[i*T + j - 1]+
+                               beta[9] * state[i*T + j - 1])+
+          theta[1] * availc[i*T + j]+
+          theta[2] * state[i*T + j]+
+          theta[3] * availc[i*T + j - 1]+
+          theta[4] * statec[i*T + j - 1]
+        # error 
+        err[i*T + j] = err[i*T + j]+ coeferr * err[i*T + j - 1] 
+        # response 
+        y[i*T + j] = ym + err[i*T + j]
+      }
+    }
+    
+    d = data.frame(ty = ty, tmod = tmod, tavail = tavail, tstate = tstate,
+                   base = base, state = state, q = q, a = a, y = y, err = err,
+                   avail = avail, p = prob, a.center = ac,
+                   state.center = statec, avail.center = availc)
+    return(d)
+  }
+  
+  
   
   d <- rsnmm(
     n = as.integer(n) ,
@@ -221,10 +224,15 @@ rsnmm.R <- function(n, tmax, control, ...) {
   return(d)
 }
 
+
+
+# this function is the main simulator function, 
+# It will produce 1000 Monte Carlo replicates comparing the WCLS estimator as well as proposed A2-WCLS estimator
 sim_wc <- function(n = 100, tmax = 30, M = 1000,
                    ## response regression models
                    y.formula = list(w = y ~ state + I(a - pn),
                                     u = y ~ I(state-statec) * I(a - pn)),
+                   centering.base = list( u = "one"),
                    contrast_vec = list(w = c(0,0,1),
                                        u = c(0,0,1,0)),
                    y.moderator = list(w = "None", 
@@ -294,7 +302,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
   ## general model fitter
   ## nb: d is the data frame for the replicate
   fitter <- function(formula, args, prob, coef, label, response = "y",
-                     addvar = NULL,c_vec, moderator) {
+                     addvar = NULL,c_vec, moderator, base) {
     if (response == "y") {
       runin <- runin.fity
     }else{
@@ -360,9 +368,16 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
         
         
         # moderator centering
-        centering_model<- do.call(lm.wfit, list(x = matrix(c(d[r,"one"], d[r,"time"]), ncol = 2),
-                                                y = d[r, moderator],
-                                                w = weights))
+        if(length(base)>1){
+          centering_model<- do.call(lm.wfit, list(x = d[r,base],
+                                                  y = d[r, moderator],
+                                                  w = weights))
+        }else{
+          centering_model<- do.call(lm.wfit, list(x = matrix(d[r,base]),
+                                                  y = d[r, moderator],
+                                                  w = weights))
+        }
+        
         
         if (!inherits(centering_model, "geeglm")){
           centering_model <- glm2gee(centering_model, d$id[r])
@@ -386,6 +401,7 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
         fit$terms <- terms(formula)
         fit$lag = lag
         fit$label = label$w
+        fit$base = base
       }
       
       fit$vcov <- vcov.geeglm(l,x=fit, moderator= moderator)
@@ -425,11 +441,11 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
     
     fity_w <- fitter(formula = y.formula[["w"]], args = y.args, prob = y.prob,
                      coef = y.coef, label = y.label, c_vec= contrast_vec[["w"]],
-                     moderator = y.moderator[["w"]])
+                     moderator = y.moderator[["w"]], base = centering.base$w)
     
     fity_u <- fitter(formula = y.formula[["u"]], args = y.args, prob = y.prob,
                      coef = y.coef, label = y.label,c_vec= contrast_vec[["u"]],
-                     moderator = y.moderator[["u"]])
+                     moderator = y.moderator[["u"]], base = centering.base$u)
     
     fity = rbind(fity_w,fity_u)
     

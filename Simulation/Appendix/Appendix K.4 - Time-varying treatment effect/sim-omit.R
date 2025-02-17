@@ -30,13 +30,17 @@ sim.omit <- function() {
                      ## ignoring the underlying interaction between the two
                      y.formula = list(w = y ~ state + I(a - pn) + I((a - pn) * time),
                                       u = y ~ state + I(a - pn) + I((a - pn) * time) + I((a - pn) * (state - state_mod)) ),
-                     contrast_vec = list(w = list(c(0,0,1,0), c(0,0,0,1)),
-                                         u = list(c(0,0,1,0,0),c(0,0,0,1,0))),
+                     # the feature vector of the centering function
+                     centering.base = list( w = NULL,
+                                            u = c("one","time")),
+                     # to extract the coefficients of interest from the fitted model above
+                     contrast_vec = list(w = c(0,0,1,1),
+                                         u = c(0,0,1,1,0)),
                      y.moderator = list(w = "None", 
                                         u = "state"),
                      y.names = c(w = "Weighted and centered"),
                      ## term labels for proximal treatment
-                     y.label = list(w = "I(a - pn)"),
+                     y.label = list(w = c("I(a - pn)", "I((a - pn) * time)")),
                      ## specify weights and working correlation structure
                      y.args = list(w = list(wn = "pn", wd = "prob")),
                      ## specify weight numerator model
