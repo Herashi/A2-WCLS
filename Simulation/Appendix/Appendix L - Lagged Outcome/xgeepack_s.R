@@ -442,11 +442,13 @@ vcov.geeglm <- function(l,x,moderator,...) {
   if (is.null(v)) {
     w <- working.covariance(x, invert = TRUE)
     b <- bread.geeglm(x, wcovinv = w)
-    if(moderator != "None"){
-      m <- stacking_meat(l,x)
-    }else{
-      m <- meat.geeglm(x, wcovinv = w, ...)
-    }
+    
+    m <- meat.geeglm(x, wcovinv = w, ...)
+    # if(moderator != "None"){
+    #   m <- stacking_meat(l,x)
+    # }else{
+    #   m <- meat.geeglm(x, wcovinv = w, ...)
+    # }
     v <- b %*% m %*% t(b)
   }
   v

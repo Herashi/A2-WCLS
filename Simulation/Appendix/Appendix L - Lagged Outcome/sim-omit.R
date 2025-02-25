@@ -1,4 +1,4 @@
-setwd("~/Documents/GitHub/A2-WCLS/Simulation/lagged outcome")
+setwd("~/Documents/GitHub/A2-WCLS/Simulation/Appendix/Appendix L - Lagged Outcome")
 # loading packages
 source("init.R")
 
@@ -29,10 +29,10 @@ sim.omit <- function() {
                              ## regress response on state and proximal treatment,
                              ## ignoring the underlying interaction between the two
                              y.formula = list(w = y ~ I(lag1a - lag1pn),
-                                              u = y ~ I(state - state_int) + I(lag1a - lag1pn) + I((lag1a - lag1pn) * (state - state_mod))),
+                                              u = y ~ I(a - pn) + I(lag1a - lag1pn) ),
                              # to extract the coefficients of interest from the fitted model above
                              contrast_vec = list(w = c(0,1),
-                                                 u = c(0,0,1,0)),
+                                                 u = c(0,0,1)),
                              # the non-adjusted method versus the A2-WCLS auxiliary variable adjusted approach
                              y.moderator = list(w = "None", 
                                                 u = "state"),

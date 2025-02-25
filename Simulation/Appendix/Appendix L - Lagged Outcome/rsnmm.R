@@ -22,8 +22,8 @@ expit = function(a){
 rsnmm.control <- function(origin = 1, sd = 1,
                           coralpha = sqrt(0.5),
                           corstr = c("ar1", "exchangeable"),
-                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = c(-0.1,0,0,0.5),
-                          eta = c(0, 0, 0, 0, 0), mu = rep(0, 3),
+                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = c(-0.1,0,0,0),
+                          eta = c(0, 0, 0.8, -0.8, 0), mu = rep(0, 3),
                           theta0 = c(0, 0.8), theta1 = c(0, 0),
                           coef.avail = c(100, rep(0, 3)), coef.state = rep(0,5) ,
                           tfun = NULL, lag = 3 + any(beta1 != 0)) {
