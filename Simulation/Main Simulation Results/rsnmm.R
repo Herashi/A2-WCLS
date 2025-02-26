@@ -22,10 +22,10 @@ expit = function(a){
 rsnmm.control <- function(origin = 1, sd = 1,
                           coralpha = sqrt(0.5),
                           corstr = c("ar1", "exchangeable"),
-                          beta0 = c(-0.2, 0.2, 0, 0.2, 0), beta1 = c(-0.1,0,0,0.5),
-                          eta = c(0, 0, 0, 0, 0), mu = rep(0, 3),
-                          theta0 = c(0, 0.8), theta1 = c(0, 0),
-                          coef.avail = c(100, rep(0, 3)), coef.state = rep(0,5) ,
+                          beta0 = c(-0.2, 0, 0, 0.8, 0), beta1 = c(-0.1,0,0,0.2),
+                          eta = c(0, 0, 0.8, -0.8, 0), mu = rep(0, 3),
+                          theta0 = c(0, 0.2), theta1 = c(0, 0),
+                          coef.avail = c(100, rep(0, 3)), coef.state = rep(0,5),
                           tfun = NULL, lag = 3 + any(beta1 != 0)) {
   corstr <- match.arg(corstr)
   if (is.null(tfun))
@@ -147,8 +147,7 @@ rsnmm.R <- function(n, tmax, control, ...) {
           ac[i*T + j - 1] * (beta[6]+
                                beta[7] * tmod[j - 1]+
                                beta[8] * base[i*T + j - 1]+
-                               # beta[9] * state[i*T + j - 1])+
-                               beta[9] * state[i*T + j])+
+                               beta[9] * statec[i*T + j -1])+
           theta[1] * availc[i*T + j]+
           theta[2] * state[i*T + j]+
           theta[3] * availc[i*T + j - 1]+
@@ -351,16 +350,6 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
         weights =  w *(d[r,"a"] - d[r, args[["w"]][["wn"]]] )^2
         
         if(lag){
-          # intercept centering
-          centering_model<- do.call(lm.wfit, list(x = matrix(d[r,"lag1a"] - d[r,"lag1pn"]),
-                                                  y = d[r, moderator],
-                                                  w =  w))
-          
-          if (!inherits(centering_model, "geeglm")){
-            centering_model <- glm2gee(centering_model, d$id[r])
-          }
-          
-          d[r,"state_int"] = centering_model[["fitted.values"]]
           
           weights =  w *(d[r,"lag1a"] - d[r, paste0("lag1", args[["w"]][["wn"]])] )^2
           
@@ -378,8 +367,9 @@ sim_wc <- function(n = 100, tmax = 30, M = 1000,
         
         d[r,"state_mod"] = centering_model[["fitted.values"]]
         
-        l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
+        
       }
+      l <- list(x = model.matrix(formula, data = d[r, ]), y = d[r, response])
       
       l$w = w
       # refit the model

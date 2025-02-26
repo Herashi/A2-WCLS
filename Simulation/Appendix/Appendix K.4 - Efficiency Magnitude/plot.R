@@ -1,4 +1,4 @@
-setwd("~/Documents/A2-WCLS/Simulation/Efficiency Magnitude")
+setwd("~/Documents/Github/A2-WCLS/Simulation/Appendix/Appendix K.5 - Efficiency Magnitude")
 library(ggplot2)
 M = 1000
 
@@ -9,7 +9,7 @@ df_n <- data.frame(var1=rep(0,1000),
 
 load("test_100_50.RData")
 
-out = omit[["out"]]
+out = out[["out"]]
 out_u = out[seq(2,2*M,by = 2),]
 out_w = out[seq(1,2*M-1,by = 2),]
 
@@ -17,7 +17,7 @@ df_n$var1 = out_w$sec^2 / (out_u$sec^2)
 
 load("test_250_50.RData")
 
-out = omit[["out"]]
+out = out[["out"]]
 out_u = out[seq(2,2*M,by = 2),]
 out_w = out[seq(1,2*M-1,by = 2),]
 
@@ -27,7 +27,7 @@ df_n$var2 = out_w$sec^2 / (out_u$sec^2)
 
 load("test_500_50.RData")
 
-out = omit[["out"]]
+out = out[["out"]]
 out_u = out[seq(2,2*M,by = 2),]
 out_w = out[seq(1,2*M-1,by = 2),]
 
@@ -54,7 +54,7 @@ df_t <- data.frame(var1=rep(0,1000),
 
 load("test_250_30.RData")
 
-out = omit[["out"]]
+out = out[["out"]]
 out_u = out[seq(2,2*M,by = 2),]
 out_w = out[seq(1,2*M-1,by = 2),]
 
@@ -62,7 +62,7 @@ df_t$var1 = out_w$sec^2 / (out_u$sec^2)
 
 load("test_250_50.RData")
 
-out = omit[["out"]]
+out = out[["out"]]
 out_u = out[seq(2,2*M,by = 2),]
 out_w = out[seq(1,2*M-1,by = 2),]
 
@@ -72,7 +72,7 @@ df_t$var2 = out_w$sec^2 / (out_u$sec^2)
 
 load("test_250_100.RData")
 
-out = omit[["out"]]
+out = out[["out"]]
 out_u = out[seq(2,2*M,by = 2),]
 out_w = out[seq(1,2*M-1,by = 2),]
 

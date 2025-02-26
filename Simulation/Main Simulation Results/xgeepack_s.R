@@ -29,10 +29,6 @@ stacking_meat = function(l,x = fit, wcovinv = NULL,...){
   E_dza_dtheta2 = mean(sapply(split(-res*w*df[,x[["label"]]] +w*beta_1*df[,4]*df[,x[["label"]]], x$id), sum))
   
   
-  # weights = ifelse(df[,x[["label"]]]>0, df[,x[["label"]]]*(1-df[,x[["label"]]]), 
-  # -df[,x[["label"]]]*(1+df[,x[["label"]]]))
-  # E_dtheta2_theta2 = - mean(sapply(split(weights, x$id), sum))
-  
   E_dtheta2_theta2 = -mean(sapply(split(w*df[,x[["label"]]]^2, x$id), sum))
   U_theta2 = matrix(unname(sapply(split(w*df[,4]*df[,x[["label"]]], x$id), sum)))
   
@@ -41,21 +37,21 @@ stacking_meat = function(l,x = fit, wcovinv = NULL,...){
   
   U_extra = U_theta2 %*% t(d_theta2) /E_dtheta2_theta2
   
-  if (x$lag){
-    alpha_1 = x[["coefficients"]]["I(state - state_int)"]
-    
-    E_dint_dtheta1 = mean(sapply(split(w*df[,x[["label"]]], x$id), sum))* alpha_1
-    E_dz_dtheta1 = mean(sapply(split(-res*df[,x[["label"]]]*w + w*alpha_1*df[,x[["label"]]]*df[,2], x$id), sum))
-    E_dbeta_dtheta1 = mean(sapply(split(w*df[,x[["label"]]]*df[,3], x$id), sum)) * alpha_1
-    E_dza_dtheta1 = mean(sapply(split(w*df[,x[["label"]]]*df[,4], x$id), sum)) * alpha_1
-    
-    E_dtheta1_theta1 = E_dtheta2_theta2
-    U_theta1 = matrix(unname(sapply(split(w*df[,"I(state - state_int)"]*df[,x[["label"]]], x$id), sum)))
-    
-    d_theta1 = matrix(c(E_dint_dtheta1,E_dz_dtheta1,E_dbeta_dtheta1,E_dza_dtheta1))
-    
-    U_extra = U_extra + U_theta1 %*% t(d_theta1)/E_dtheta1_theta1
-  }
+  # if (x$lag){
+  #   alpha_1 = x[["coefficients"]]["I(state - state_int)"]
+  #   
+  #   E_dint_dtheta1 = mean(sapply(split(w*df[,x[["label"]]], x$id), sum))* alpha_1
+  #   E_dz_dtheta1 = mean(sapply(split(-res*df[,x[["label"]]]*w + w*alpha_1*df[,x[["label"]]]*df[,2], x$id), sum))
+  #   E_dbeta_dtheta1 = mean(sapply(split(w*df[,x[["label"]]]*df[,3], x$id), sum)) * alpha_1
+  #   E_dza_dtheta1 = mean(sapply(split(w*df[,x[["label"]]]*df[,4], x$id), sum)) * alpha_1
+  #   
+  #   E_dtheta1_theta1 = E_dtheta2_theta2
+  #   U_theta1 = matrix(unname(sapply(split(w*df[,"I(state - state_int)"]*df[,x[["label"]]], x$id), sum)))
+  #   
+  #   d_theta1 = matrix(c(E_dint_dtheta1,E_dz_dtheta1,E_dbeta_dtheta1,E_dza_dtheta1))
+  #   
+  #   U_extra = U_extra + U_theta1 %*% t(d_theta1)/E_dtheta1_theta1
+  # }
   
   u_final = t(u - U_extra) %*% (u - U_extra)
   
