@@ -1,26 +1,57 @@
-# A2-WCLS
+# A2-WCLS: Simulation and Case Study Code Repository  
 
-This repository contains the R code used to generate the simulation experiments and case study results in the paper *Incorporating Auxiliary Variables to Improve the Efficiency of Time-varying Treatment Effect Estimation*. The manuscript can be found [here](http://arxiv.org/abs/2306.17260).
+This repository contains the complete R code used to generate the simulation experiments and case study results for the manuscript:  
 
+**"Incorporating Auxiliary Variables to Improve the Efficiency of Time-varying Treatment Effect Estimation"**  
 
+Manuscript available on [arXiv](http://arxiv.org/abs/2306.17260).  
 
-## Reproducibility materials file structure
+## Repository Overview  
 
-***Figures***: To reproduce Figures 1 and 2 in Section 7, execute the `Case Study.Rmd` file found in the **Case Study** folder with the provided data.
+This repository is organized to facilitate full reproducibility of all empirical results presented in the manuscript. The code is structured into two main components:  
 
-***Empirical Results***: To generate the tables presented in all simulation sections, check **Simulation** folder and follow these steps:
+1. **Case Study Analysis**  
+2. **Simulation Studies**  
 
-1.  Locate the relevant folder; 
-2.  Install all required packages;
-2.  Reset `setwd("")` for `sim-omit.R`;
-3.  Run the `sim-omit.R` script. (NB: we strongly recommend using parallel computing to speed up the simulation. It usually takes about 30min in total)
+Each component is self-contained with all necessary scripts, functions, and documentation.  
 
+## Reproducibility Instructions  
 
-Each folder is self-contained, meaning all necessary files to generate specific tables for each section are included within the folder. Take the **Main Simulation Results** as an example:
+### Case Study Results  
 
+To reproduce Figures 1 and 2 from Section 7:  
 
-1.  `sim-omit.R` - This file is the main simulation execution file;
-2.  `init.R` - This file loads the packages needed for the simulation;
-3.  `rsnmm.R` - This file has functions used to generate MRT data, and the functions used to assess the causal excursion effect;
-4.  `xgeepack_s.R` - This file contains functions for robust variance estimation;
-5.  `xzoo.R`  - This file contains functions for MRT data manipulation.
+1. Navigate to the `Case Study` directory  
+2. Execute the `Case Study.Rmd` R Markdown file  
+3. Required data files are provided in the directory  
+
+### Simulation Studies  
+
+To regenerate all simulation results presented in the manuscript:  
+
+1. Navigate to the relevant subdirectory within `Simulation/`  
+2. Follow these steps for each simulation study:  
+
+   a. Install all required R packages (listed in `init.R`)  
+   b. Set the working directory path in `sim-omit.R`  
+   c. Execute `sim-omit.R` (Note: Parallel computing is strongly recommended - typical runtime is ~30 minutes)  
+
+## Directory Structure and File Descriptions  
+
+Each simulation subdirectory contains the following core files:  
+
+| File | Purpose |  
+|------|---------|  
+| `sim-omit.R` | Main simulation execution script |  
+| `init.R` | Package dependencies and initialization |  
+| `rsnmm.R` | Data generation functions for MRT studies and causal excursion effect estimation |  
+| `xgeepack_s.R` | Robust variance estimation functions |  
+| `xzoo.R` | MRT data manipulation utilities |  
+
+## Computational Considerations  
+
+1. **Parallel Processing**: All simulation scripts are designed to leverage parallel computing for efficient execution  
+2. **Resource Requirements**:  
+   - Memory: Minimum 8GB RAM recommended  
+   - Processing: Multi-core CPU strongly advised  
+3. **Runtime**: Approximately 30 minutes for full simulation suite  

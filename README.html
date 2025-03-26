@@ -352,44 +352,113 @@ display: none;
 </div>
 
 
-<div id="a2-wcls" class="section level1">
-<h1>A2-WCLS</h1>
-<p>This repository contains the R code used to generate the simulation
-experiments and case study results in the paper <em>Incorporating
-Auxiliary Variables to Improve the Efficiency of Time-varying Treatment
-Effect Estimation</em>. The manuscript can be found <a href="http://arxiv.org/abs/2306.17260">here</a>.</p>
-<div id="reproducibility-materials-file-structure" class="section level2">
-<h2>Reproducibility materials file structure</h2>
-<p><strong><em>Figures</em></strong>: To reproduce Figures 1 and 2 in
-Section 7, execute the <code>Case Study.Rmd</code> file found in the
-<strong>Case Study</strong> folder with the provided data.</p>
-<p><strong><em>Empirical Results</em></strong>: To generate the tables
-presented in all simulation sections, check <strong>Simulation</strong>
-folder and follow these steps:</p>
+<div id="a2-wcls-simulation-and-case-study-code-repository" class="section level1">
+<h1>A2-WCLS: Simulation and Case Study Code Repository</h1>
+<p>This repository contains the complete R code used to generate the
+simulation experiments and case study results for the manuscript:</p>
+<p><strong>“Incorporating Auxiliary Variables to Improve the Efficiency
+of Time-varying Treatment Effect Estimation”</strong></p>
+<p>Manuscript available on <a href="http://arxiv.org/abs/2306.17260">arXiv</a>.</p>
+<div id="repository-overview" class="section level2">
+<h2>Repository Overview</h2>
+<p>This repository is organized to facilitate full reproducibility of
+all empirical results presented in the manuscript. The code is
+structured into two main components:</p>
 <ol style="list-style-type: decimal">
-<li>Locate the relevant folder;</li>
-<li>Install all required packages;</li>
-<li>Reset <code>setwd(&quot;&quot;)</code> for <code>sim-omit.R</code>;</li>
-<li>Run the <code>sim-omit.R</code> script. (NB: each Monte Carlo
-replication takes approximately 2–3 minutes, so we strongly recommend
-using parallel computing to speed up the simulation.)</li>
+<li><strong>Case Study Analysis</strong><br />
+</li>
+<li><strong>Simulation Studies</strong></li>
 </ol>
-<p>Each folder is self-contained, meaning all necessary files to
-generate specific tables for each section are included within the
-folder. Most of the code are identical, only a few small twist to change
-the data generating process, or the model fitted. Take the <strong>Main
-Simulation Results</strong> as an example:</p>
+<p>Each component is self-contained with all necessary scripts,
+functions, and documentation.</p>
+</div>
+<div id="reproducibility-instructions" class="section level2">
+<h2>Reproducibility Instructions</h2>
+<div id="case-study-results" class="section level3">
+<h3>Case Study Results</h3>
+<p>To reproduce Figures 1 and 2 from Section 7:</p>
 <ol style="list-style-type: decimal">
-<li><code>sim-omit.R</code> - This file is the main simulation execution
-file;</li>
-<li><code>init.R</code> - This file loads the packages needed for the
-simulation;</li>
-<li><code>rsnmm.R</code> - This file has functions used to generate MRT
-data, and the functions used to assess the causal excursion effect;</li>
-<li><code>xgeepack_s.R</code> - This file contains functions for robust
-variance estimation;</li>
-<li><code>xzoo.R</code> - This file contains functions for MRT data
-manipulation.</li>
+<li>Navigate to the <code>Case Study</code> directory<br />
+</li>
+<li>Execute the <code>Case Study.Rmd</code> R Markdown file<br />
+</li>
+<li>Required data files are provided in the directory</li>
+</ol>
+</div>
+<div id="simulation-studies" class="section level3">
+<h3>Simulation Studies</h3>
+<p>To regenerate all simulation results presented in the manuscript:</p>
+<ol style="list-style-type: decimal">
+<li><p>Navigate to the relevant subdirectory within
+<code>Simulation/</code><br />
+</p></li>
+<li><p>Follow these steps for each simulation study:</p>
+<ol style="list-style-type: lower-alpha">
+<li>Install all required R packages (listed in
+<code>init.R</code>)<br />
+</li>
+<li>Set the working directory path in <code>sim-omit.R</code><br />
+</li>
+<li>Execute <code>sim-omit.R</code> (Note: Parallel computing is
+strongly recommended - typical runtime is ~30 minutes)</li>
+</ol></li>
+</ol>
+</div>
+</div>
+<div id="directory-structure-and-file-descriptions" class="section level2">
+<h2>Directory Structure and File Descriptions</h2>
+<p>Each simulation subdirectory contains the following core files:</p>
+<table>
+<colgroup>
+<col width="40%" />
+<col width="60%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>sim-omit.R</code></td>
+<td>Main simulation execution script</td>
+</tr>
+<tr class="even">
+<td><code>init.R</code></td>
+<td>Package dependencies and initialization</td>
+</tr>
+<tr class="odd">
+<td><code>rsnmm.R</code></td>
+<td>Data generation functions for MRT studies and causal excursion
+effect estimation</td>
+</tr>
+<tr class="even">
+<td><code>xgeepack_s.R</code></td>
+<td>Robust variance estimation functions</td>
+</tr>
+<tr class="odd">
+<td><code>xzoo.R</code></td>
+<td>MRT data manipulation utilities</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="computational-considerations" class="section level2">
+<h2>Computational Considerations</h2>
+<ol style="list-style-type: decimal">
+<li><strong>Parallel Processing</strong>: All simulation scripts are
+designed to leverage parallel computing for efficient execution<br />
+</li>
+<li><strong>Resource Requirements</strong>:
+<ul>
+<li>Memory: Minimum 8GB RAM recommended<br />
+</li>
+<li>Processing: Multi-core CPU strongly advised<br />
+</li>
+</ul></li>
+<li><strong>Runtime</strong>: Approximately 30 minutes for full
+simulation suite</li>
 </ol>
 </div>
 </div>
